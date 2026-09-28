@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 72" role="img" aria-labelledby="title desc">
+  <title id="title">TradeFlow</title>
+  <desc id="desc">TradeFlow estimate sheet and checkmark logo, with the tagline Clear estimates. Stronger businesses.</desc>
+  <rect x="0" y="4" width="64" height="64" rx="17" fill="#d96b36"/>
+  <path d="M18 14h19l11 11v32H18z" fill="none" stroke="#fff8ec" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M37 14v11h11" fill="none" stroke="#fff8ec" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M26 35h14M26 42h14" fill="none" stroke="#fff8ec" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="m29 50 3.7 3.7 8-8.3" fill="none" stroke="#fff8ec" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="82" y="39" fill="#1d2925" font-family="Arial, Helvetica, sans-serif" font-size="31" font-weight="800" letter-spacing="-1.5">Trade</text>
+  <text x="167" y="39" fill="#d96b36" font-family="Arial, Helvetica, sans-serif" font-size="31" font-weight="800" letter-spacing="-1.5">Flow</text>
+  <text x="84" y="57" fill="#68736c" font-family="Arial, Helvetica, sans-serif" font-size="8.5" font-weight="700" letter-spacing="1.05">CLEAR ESTIMATES. STRONGER BUSINESSES.</text>
+</svg>

@@ -1,0 +1,359 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+
+interface LineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+}
+
+interface Estimate {
+  id: string;
+  client_name: string;
+  client_email: string;
+  client_phone?: string;
+  job_address?: string;
+  status: string;
+  require_deposit: boolean;
+  deposit_percentage: number;
+  created_at: string;
+  package_options?: EstimatePackage[];
+  signature_name?: string | null;
+  selected_package?: string | null;
+  accepted_at?: string | null;
+}
+
+interface EstimatePackage {
+  name: string;
+  description: string;
+  total: number;
+}
+
+export default function ClientEstimatePage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params?.id as string;
+
+  const [estimate, setEstimate] = useState<Estimate | null>(null);
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
+  const [signatureName, setSignatureName] = useState("");
+
+  useEffect(() => {
+    async function fetchEstimateDetails() {
+      if (!id) return;
+      setLoading(true);
+      try {
+        // Fetch estimate details
+        const { data: estData, error: estError } = await supabase
+          .from("estimates")
+          .select("*")
+          .eq("id", id)
+          .single();
+
+        if (estError || !estData) {
+          setErrorMsg("Estimate not found or link has expired.");
+          return;
+        }
+
+        setEstimate(estData);
+        setSignatureName(estData.signature_name || "");
+        const savedPackageIndex = Array.isArray(estData.package_options) ? estData.package_options.findIndex((option: EstimatePackage) => option.name === estData.selected_package) : -1;
+        if (savedPackageIndex >= 0) setSelectedPackage(savedPackageIndex);
+        void fetch(`/api/estimates/${id}/view`, { method: "POST" });
+
+        // Fetch associated line items
+        const { data: itemData, error: itemError } = await supabase
+          .from("line_items")
+          .select("*")
+          .eq("estimate_id", id);
+
+        if (itemError) throw itemError;
+        setLineItems(itemData || []);
+      } catch (err: any) {
+        console.error("Error loading proposal:", err.message);
+        setErrorMsg("Failed to load estimate details.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchEstimateDetails();
+  }, [id]);
+
+  const lineItemTotal = lineItems.reduce(
+    (sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0),
+    0
+  );
+  const subtotal = selectedPackage !== null && estimate?.package_options?.[selectedPackage]
+    ? Number(estimate.package_options[selectedPackage].total)
+    : lineItemTotal;
+
+  const depositAmount = estimate?.require_deposit
+    ? subtotal * ((estimate.deposit_percentage || 0) / 100)
+    : 0;
+
+  const handleApproveAndPay = async () => {
+    if (signatureName.trim().length < 2) {
+      setErrorMsg("Enter your full name to approve this estimate.");
+      return;
+    }
+    setPaying(true);
+    try {
+      const approval = await fetch(`/api/estimates/${id}/accept`, {
+        method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ signatureName, selectedPackage: selectedPackage === null ? null : estimate?.package_options?.[selectedPackage]?.name }),
+      });
+      const approvalData = await approval.json();
+      if (!approval.ok) throw new Error(approvalData.error || "Approval could not be recorded.");
+      setEstimate((current) => current ? { ...current, signature_name: signatureName.trim(), selected_package: selectedPackage === null ? null : estimate?.package_options?.[selectedPackage]?.name, accepted_at: new Date().toISOString(), status: "accepted" } : current);
+
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          estimateId: estimate?.id,
+          amount: depositAmount > 0 ? depositAmount : subtotal,
+          clientEmail: estimate?.client_email,
+          clientName: estimate?.client_name,
+          selectedPackage: selectedPackage === null ? null : estimate?.package_options?.[selectedPackage]?.name,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Payment initialization failed: " + (data.error || "Unknown error"));
+        setPaying(false);
+      }
+    } catch (err: any) {
+      alert("Error processing approval: " + err.message);
+      setPaying(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="text-center space-y-2">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            Loading Proposal...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (errorMsg || !estimate) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm max-w-md text-center space-y-3">
+          <div className="text-red-500 text-2xl">⚠️</div>
+          <h1 className="text-base font-bold text-slate-900">Unable to View Proposal</h1>
+          <p className="text-xs text-slate-500">{errorMsg || "Invalid estimate request."}</p>
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-500 underline pt-2 block mx-auto"
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
+      <div className="max-w-3xl mx-auto space-y-4">
+        {/* Contractor Admin Bar (Edit & Navigation Controls) */}
+        <div className="bg-slate-900 text-white p-3.5 rounded-xl flex items-center justify-between text-xs shadow-sm">
+          <div className="flex items-center space-x-2">
+            <span className="font-semibold text-slate-300">Status:</span>
+            <span
+              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                estimate.status === "paid" || estimate.status === "accepted"
+                  ? "bg-green-500 text-white"
+                  : "bg-yellow-500 text-slate-900"
+              }`}
+            >
+              {estimate.status}
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={() => router.push(`/estimate/${id}/edit`)}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors flex items-center space-x-1 shadow-sm"
+            >
+              <span>✏️</span>
+              <span>Edit Estimate</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard")}
+              className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg font-medium border border-slate-700 transition-colors"
+            >
+              Dashboard
+            </button>
+          </div>
+        </div>
+
+        {/* Client Proposal Card */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
+          {/* Proposal Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 gap-2">
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">Service Estimate</h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Created on {new Date(estimate.created_at).toLocaleDateString()}
+              </p>
+            </div>
+            <div className="text-left sm:text-right">
+              <span className="text-xs font-semibold text-slate-400 block uppercase tracking-wider">
+                Total Estimate
+              </span>
+              <span className="text-2xl font-black text-slate-900">
+                ${subtotal.toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex justify-end print:hidden">
+            <button type="button" onClick={() => window.print()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Print / Save PDF</button>
+          </div>
+
+          {estimate.package_options?.length ? (
+            <section className="space-y-3">
+              <div><h2 className="text-sm font-semibold text-slate-900">Choose the option that fits your home</h2><p className="mt-1 text-xs text-slate-500">Select one package to approve.</p></div>
+              <div className="grid gap-3 md:grid-cols-3">
+                {estimate.package_options.map((option, index) => (
+                  <button key={`${option.name}-${index}`} type="button" onClick={() => setSelectedPackage(index)} className={`rounded-xl border p-4 text-left transition ${selectedPackage === index ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200 bg-white hover:border-slate-400"}`}>
+                    <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{option.name}</span>
+                    <span className="mt-2 block text-xl font-bold text-slate-900">${Number(option.total).toFixed(2)}</span>
+                    {option.description && <span className="mt-2 block text-xs leading-5 text-slate-600">{option.description}</span>}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {/* Client & Job Details */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs">
+            <div>
+              <span className="font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                Prepared For
+              </span>
+              <p className="font-bold text-slate-900 text-sm">{estimate.client_name}</p>
+              <p className="text-slate-600">{estimate.client_email}</p>
+              {estimate.client_phone && (
+                <p className="text-slate-600">{estimate.client_phone}</p>
+              )}
+            </div>
+
+            <div>
+              <span className="font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                Job Location
+              </span>
+              <p className="font-medium text-slate-800">
+                {estimate.job_address || "Address not specified"}
+              </p>
+            </div>
+          </div>
+
+          {/* Scope of Work Table */}
+          <div className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Scope of Work
+            </h2>
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
+                  <tr>
+                    <th className="p-3">Description</th>
+                    <th className="p-3 text-center">Qty</th>
+                    <th className="p-3 text-right">Rate</th>
+                    <th className="p-3 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {lineItems.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50/50">
+                      <td className="p-3 font-medium text-slate-800">
+                        {item.description}
+                      </td>
+                      <td className="p-3 text-center text-slate-600">
+                        {item.quantity}
+                      </td>
+                      <td className="p-3 text-right text-slate-600">
+                        ${Number(item.unit_price).toFixed(2)}
+                      </td>
+                      <td className="p-3 text-right font-semibold text-slate-900">
+                        ${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Deposit & Summary Box */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3 text-sm">
+            <div className="flex justify-between items-center text-slate-600">
+              <span>Subtotal</span>
+              <span className="font-semibold text-slate-900">${subtotal.toFixed(2)}</span>
+            </div>
+
+            {estimate.require_deposit && (
+              <div className="flex justify-between items-center text-green-700 font-semibold pt-2 border-t border-slate-200">
+                <span>Required Down-Payment ({estimate.deposit_percentage}%)</span>
+                <span>${depositAmount.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Client Action Button */}
+          {estimate.status === "paid" ? (
+            <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl text-center font-semibold text-sm">
+              ✓ Deposit Paid & Proposal Accepted
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                {estimate.package_options?.length && selectedPackage === null && <p className="text-xs font-semibold text-amber-800">Select a package above to continue.</p>}
+                <label className="block text-xs font-semibold text-slate-700">Type your full name to approve<input value={signatureName} onChange={(event) => { setSignatureName(event.target.value); setErrorMsg(""); }} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" autoComplete="name" placeholder="Full name" /></label>
+                <p className="text-[11px] leading-5 text-slate-500">Typing your name records your approval of this estimate.</p>
+                {estimate.signature_name && <p className="text-xs font-medium text-green-700">Approved by {estimate.signature_name}{estimate.accepted_at ? ` on ${new Date(estimate.accepted_at).toLocaleDateString()}` : ""}</p>}
+                {errorMsg && <p role="alert" className="text-xs text-red-700">{errorMsg}</p>}
+              </div>
+              <button
+                type="button"
+                onClick={handleApproveAndPay}
+                disabled={paying || signatureName.trim().length < 2 || Boolean(estimate.package_options?.length && selectedPackage === null)}
+              className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3.5 rounded-xl transition-colors shadow-sm disabled:opacity-50 text-sm"
+            >
+              {paying
+                ? "Connecting to Payment Portal..."
+                : estimate.require_deposit
+                ? `Approve & Pay Deposit ($${depositAmount.toFixed(2)})`
+                : `Approve Proposal ($${subtotal.toFixed(2)})`}
+            </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

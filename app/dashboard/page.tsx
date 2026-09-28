@@ -1,0 +1,280 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+
+interface Estimate {
+  id: string;
+  client_name: string;
+  client_email: string;
+  job_address: string;
+  status: string;
+  require_deposit: boolean;
+  deposit_percentage: number;
+  is_archived: boolean;
+  created_at: string;
+  followup_at: string | null;
+  followup_sent_at: string | null;
+  proposal_viewed_at: string | null;
+}
+
+export default function DashboardPage() {
+  const [estimates, setEstimates] = useState<Estimate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentTab, setCurrentTab] = useState<"active" | "archived">("active");
+  const [isPro, setIsPro] = useState(false);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sendMessage, setSendMessage] = useState("");
+  const [emailEvents, setEmailEvents] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetchEstimates();
+  }, []);
+
+  async function fetchEstimates() {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("estimates")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setEstimates(data || []);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: plan } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
+        setIsPro(["active", "trialing"].includes(plan?.status ?? ""));
+      }
+      const { data: events } = await supabase.from("estimate_email_events").select("estimate_id, event, created_at").order("created_at", { ascending: false });
+      const latest: Record<string, string> = {};
+      for (const event of events ?? []) if (!latest[event.estimate_id]) latest[event.estimate_id] = event.event;
+      setEmailEvents(latest);
+    } catch (err: any) {
+      console.error("Error fetching dashboard estimates:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const sendEstimate = async (id: string) => {
+    setSendingId(id); setSendMessage("");
+    try {
+      const response = await fetch(`/api/estimates/${id}/send`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Email could not be sent.");
+      setEmailEvents((current) => ({ ...current, [id]: "sent" }));
+      setSendMessage("Estimate email sent.");
+    } catch (error) {
+      setSendMessage(error instanceof Error ? error.message : "Email could not be sent.");
+    } finally { setSendingId(null); }
+  };
+
+  const toggleArchiveStatus = async (id: string, shouldArchive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("estimates")
+        .update({ is_archived: shouldArchive })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setEstimates((prev) =>
+        prev.map((est) =>
+          est.id === id ? { ...est, is_archived: shouldArchive } : est
+        )
+      );
+    } catch (err: any) {
+      alert("Error updating estimate: " + err.message);
+    }
+  };
+
+  const deleteEstimate = async (id: string) => {
+    if (!confirm("Are you sure you want to permanently delete this estimate?")) {
+      return;
+    }
+
+    try {
+      // First delete associated line items
+      const { error: lineError } = await supabase
+        .from("line_items")
+        .delete()
+        .eq("estimate_id", id);
+
+      if (lineError) throw lineError;
+
+      // Then delete the estimate
+      const { error: estError } = await supabase
+        .from("estimates")
+        .delete()
+        .eq("id", id);
+
+      if (estError) throw estError;
+
+      setEstimates((prev) => prev.filter((est) => est.id !== id));
+    } catch (err: any) {
+      alert("Error deleting estimate: " + err.message);
+    }
+  };
+
+  const filteredEstimates = estimates.filter((est) =>
+    currentTab === "active" ? !est.is_archived : est.is_archived
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">TradeFlow Dashboard</h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Manage estimates, tracking, and payments
+            </p>
+          </div>
+          <Link
+            href="/"
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm"
+          >
+            + New Estimate
+          </Link>
+        </div>
+
+        <nav aria-label="Business tools" className="grid gap-3 sm:grid-cols-3">
+          <ToolLink href="/schedule" title="Schedule & jobs" description="Plan work and track job progress" />
+          <ToolLink href="/pricebook" title="Price book & templates" description="Save your rates and reusable scopes" />
+          <ToolLink href="/reports" title="Reports" description="See estimate pipeline and job totals" />
+        </nav>
+        {sendMessage && <p role="status" className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{sendMessage}</p>}
+
+        {/* Dashboard Content Container */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          {/* Header Controls & Filter Tabs */}
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setCurrentTab("active")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  currentTab === "active"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:bg-slate-200/60"
+                }`}
+              >
+                Active Estimates ({estimates.filter((e) => !e.is_archived).length})
+              </button>
+              <button
+                onClick={() => setCurrentTab("archived")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  currentTab === "archived"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:bg-slate-200/60"
+                }`}
+              >
+                Archived ({estimates.filter((e) => e.is_archived).length})
+              </button>
+            </div>
+          </div>
+
+          {/* Estimates Table */}
+          {loading ? (
+            <div className="p-8 text-center text-sm text-slate-500">
+              Loading estimates...
+            </div>
+          ) : filteredEstimates.length === 0 ? (
+            <div className="p-8 text-center text-sm text-slate-500">
+              {currentTab === "active"
+                ? "No active estimates found."
+                : "No archived estimates found."}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase font-semibold">
+                  <tr>
+                    <th className="p-3.5">Client</th>
+                    <th className="p-3.5">Job Location</th>
+                    <th className="p-3.5">Created</th>
+                    <th className="p-3.5">Status</th>
+                    <th className="p-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredEstimates.map((est) => (
+                    <tr key={est.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="p-3.5">
+                        <p className="font-semibold text-slate-900">{est.client_name}</p>
+                        <p className="text-xs text-slate-500">{est.client_email}</p>
+                      </td>
+                      <td className="p-3.5 text-slate-600">
+                        {est.job_address || "—"}
+                      </td>
+                      <td className="p-3.5 text-slate-500 text-xs">
+                        {new Date(est.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="p-3.5">
+                        <span
+                          className={`text-xs px-2.5 py-1 rounded-full font-semibold uppercase ${
+                            est.status === "paid" || est.status === "accepted"
+                              ? "bg-green-100 text-green-800 border border-green-200"
+                              : "bg-yellow-100 text-yellow-800 border border-yellow-200"
+                          }`}
+                        >
+                          {est.status}
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-right space-x-3">
+                        <Link
+                          href={`/estimate/${est.id}`}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-500 underline"
+                        >
+                          View Link
+                        </Link>
+                        {isPro ? <button onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="text-xs font-semibold text-blue-700 underline disabled:opacity-50">{sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client"}</button> : <Link href="/profile" className="text-xs font-semibold text-slate-500 underline">Email · Pro</Link>}
+                        {emailEvents[est.id] && <span className="text-[10px] font-semibold uppercase text-slate-500">{emailEvents[est.id]}</span>}
+                        {est.followup_at && <span className="text-[10px] text-slate-500">{est.followup_sent_at ? "Follow-up sent" : `Follow-up ${new Date(est.followup_at).toLocaleDateString()}`}</span>}
+                        {est.proposal_viewed_at && <span className="text-[10px] font-semibold text-green-700">Viewed</span>}
+
+                        {est.is_archived ? (
+                          <button
+                            onClick={() => toggleArchiveStatus(est.id, false)}
+                            className="text-xs font-semibold text-slate-600 hover:text-slate-900 underline"
+                          >
+                            Restore
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => toggleArchiveStatus(est.id, true)}
+                            className="text-xs font-semibold text-slate-500 hover:text-slate-700 underline"
+                          >
+                            Archive
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => deleteEstimate(est.id)}
+                          className="text-xs font-semibold text-red-600 hover:text-red-500 underline"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ToolLink({ href, title, description }: { href: string; title: string; description: string }) {
+  return (
+    <Link href={href} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md">
+      <span className="text-sm font-semibold text-slate-900">{title}</span>
+      <span className="mt-1 block text-xs text-slate-500">{description}</span>
+    </Link>
+  );
+}
