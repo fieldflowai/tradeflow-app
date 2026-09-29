@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -27,8 +28,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const { data: estimate, error: estimateError } = await supabase.from("estimates").select("id, client_name, client_email, job_address, require_deposit, deposit_percentage, package_options, selected_package").eq("id", estimateId).single();
+    const { data: estimate, error: estimateError } = await supabase.from("estimates").select("id, user_id, client_name, client_email, job_address, status, require_deposit, deposit_percentage, package_options, selected_package").eq("id", estimateId).single();
     if (estimateError || !estimate) return NextResponse.json({ error: "Estimate not found." }, { status: 404 });
+    if (estimate.status !== "accepted") return NextResponse.json({ error: "The customer must approve this estimate before payment." }, { status: 409 });
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceKey || !estimate.user_id) return NextResponse.json({ error: "Payments are not available for this estimate." }, { status: 503 });
+    const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } });
+    const { data: subscription } = await admin.from("subscriptions").select("status").eq("user_id", estimate.user_id).maybeSingle();
+    if (!subscription || !["active", "trialing"].includes(subscription.status)) return NextResponse.json({ error: "Online payments are a Pro feature." }, { status: 403 });
     const { data: lines, error: linesError } = await supabase.from("line_items").select("quantity, unit_price").eq("estimate_id", estimateId);
     if (linesError) return NextResponse.json({ error: linesError.message }, { status: 500 });
     const baseTotal = (lines ?? []).reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.unit_price || 0), 0);
@@ -51,8 +58,8 @@ export async function POST(req: Request) {
           price_data: {
             currency: "usd",
             product_data: {
-              name: `Required Job Deposit`,
-              description: `${approvedPackage ? `${approvedPackage} option · ` : ""}Deposit for ${estimate.job_address || "service request"}`,
+              name: estimate.require_deposit ? "Required Job Deposit" : "Estimate Payment",
+              description: `${approvedPackage ? `${approvedPackage} option · ` : ""}${estimate.require_deposit ? "Deposit" : "Payment"} for ${estimate.job_address || "service request"}`,
             },
             unit_amount: Math.round(amount * 100), // Stripe expects amounts in cents
           },

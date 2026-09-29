@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 
 type Estimate = { id: string; status: string; created_at: string };
 type LineItem = { estimate_id: string; quantity: number; unit_price: number };
-type Job = { status: string; quoted_total: number; scheduled_at: string | null };
+type Job = { status: string; quoted_total: number; actual_cost: number; scheduled_at: string | null };
 
 export default function ReportsPage() {
   const [estimates, setEstimates] = useState<Estimate[]>([]);
@@ -20,7 +20,7 @@ export default function ReportsPage() {
     const [estimateResult, lineResult, jobResult] = await Promise.all([
       supabase.from("estimates").select("id, status, created_at").order("created_at", { ascending: false }),
       supabase.from("line_items").select("estimate_id, quantity, unit_price"),
-      supabase.from("jobs").select("status, quoted_total, scheduled_at"),
+      supabase.from("jobs").select("status, quoted_total, actual_cost, scheduled_at"),
     ]);
     if (estimateResult.error || lineResult.error) setError("Could not load estimate data. Check your Supabase connection and permissions.");
     else {
@@ -45,6 +45,9 @@ export default function ReportsPage() {
   const wonValue = accepted.reduce((sum, estimate) => sum + estimateTotal(estimate), 0);
   const completedJobs = jobs.filter((job) => job.status === "completed");
   const completedValue = completedJobs.reduce((sum, job) => sum + Number(job.quoted_total || 0), 0);
+  const completedCost = completedJobs.reduce((sum, job) => sum + Number(job.actual_cost || 0), 0);
+  const grossProfit = completedValue - completedCost;
+  const grossMargin = completedValue > 0 ? Math.round(grossProfit / completedValue * 100) : 0;
   const monthBuckets = Array.from({ length: 6 }, (_, index) => {
     const date = new Date(); date.setDate(1); date.setMonth(date.getMonth() - (5 - index));
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -64,11 +67,12 @@ export default function ReportsPage() {
 
         {error && <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{error}</p>}
         {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">Calculating reports…</div> : <>
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <Metric label="Estimated pipeline" value={money(pipeline)} note={`${estimates.length} estimates`} />
             <Metric label="Accepted estimate value" value={money(wonValue)} note={`${accepted.length} accepted or paid`} />
             <Metric label="Acceptance rate" value={`${acceptanceRate}%`} note={`${sentOrDecided.length} active decisions`} />
             <Metric label="Completed job value" value={money(completedValue)} note={`${completedJobs.length} completed jobs`} />
+            <Metric label="Gross profit" value={money(grossProfit)} note={completedCost ? `${grossMargin}% margin · costs entered` : "Enter actual costs on the job board"} />
           </section>
 
           <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">

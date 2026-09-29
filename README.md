@@ -2,7 +2,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## TradeFlow business features
 
-The app includes contractor price books and estimate templates, a scheduled job board with status tracking, estimates and job reports, printable proposals/invoices, customer approval capture, Good/Better/Best proposal options, Pro subscriptions, cloud estimate drafting, branded estimate email, and automatic follow-up scheduling.
+The app includes contractor price books and estimate templates, a scheduled job board with status tracking and actual job costs, estimate and job reports with gross profit, printable proposals/invoices, customer approval capture, Good/Better/Best proposal options, Pro subscriptions, cloud estimate drafting, branded estimate email, and automatic follow-up scheduling.
 
 ### Supabase setup
 

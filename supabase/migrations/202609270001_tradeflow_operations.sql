@@ -92,9 +92,13 @@ create table if not exists public.jobs (
     check (invoice_status in ('draft', 'sent', 'paid')),
   notes text not null default '',
   quoted_total numeric(12,2) not null default 0 check (quoted_total >= 0),
+  actual_cost numeric(12,2) not null default 0 check (actual_cost >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.jobs
+  add column if not exists actual_cost numeric(12,2) not null default 0 check (actual_cost >= 0);
 
 create index if not exists jobs_user_schedule_idx on public.jobs(user_id, scheduled_at);
 create index if not exists jobs_user_status_idx on public.jobs(user_id, status);

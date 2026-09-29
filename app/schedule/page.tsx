@@ -17,6 +17,7 @@ interface Job {
   status: JobStatus;
   notes: string;
   quoted_total: number;
+  actual_cost: number;
 }
 interface Estimate {
   id: string;
@@ -120,6 +121,13 @@ export default function SchedulePage() {
     else setJobs((current) => current.map((job) => job.id === id ? { ...job, scheduled_at } : job).sort((a, b) => (a.scheduled_at || "9999").localeCompare(b.scheduled_at || "9999")));
   };
 
+  const updateActualCost = async (id: string, rawCost: string) => {
+    const actual_cost = Math.max(0, Number(rawCost) || 0);
+    const { error: updateError } = await supabase.from("jobs").update({ actual_cost, updated_at: new Date().toISOString() }).eq("id", id);
+    if (updateError) setError(updateError.message);
+    else setJobs((current) => current.map((job) => job.id === id ? { ...job, actual_cost } : job));
+  };
+
   const deleteJob = async (id: string) => {
     const { error: deleteError } = await supabase.from("jobs").delete().eq("id", id);
     if (deleteError) setError(deleteError.message);
@@ -185,6 +193,7 @@ export default function SchedulePage() {
                     <p className="mt-1 text-xs text-slate-500">{job.scheduled_at ? new Date(job.scheduled_at).toLocaleString() : "No date set"}{job.quoted_total ? ` · $${Number(job.quoted_total).toFixed(2)}` : ""}</p>
                     <label className="mt-2 inline-flex items-center gap-2 text-[11px] font-medium text-slate-600">Reschedule<input type="datetime-local" defaultValue={job.scheduled_at ? new Date(job.scheduled_at).toISOString().slice(0, 16) : ""} onBlur={(event) => { const value = event.target.value; if (value !== (job.scheduled_at ? new Date(job.scheduled_at).toISOString().slice(0, 16) : "")) void updateSchedule(job.id, value); }} className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs" /></label>
                     {job.notes && <p className="mt-2 text-sm text-slate-600">{job.notes}</p>}
+                    <label className="mt-2 inline-flex items-center gap-2 text-[11px] font-medium text-slate-600">Actual job cost<input type="number" min="0" step="0.01" defaultValue={Number(job.actual_cost || 0)} onBlur={(event) => { if (Number(event.target.value) !== Number(job.actual_cost || 0)) void updateActualCost(job.id, event.target.value); }} className="w-28 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs" /></label>
                     {job.estimate_id && <Link href={`/estimate/${job.estimate_id}`} className="mt-2 inline-block text-xs font-semibold text-blue-700 underline">Open estimate</Link>}
                     <Link href={`/invoice/${job.id}`} className="ml-3 mt-2 inline-block text-xs font-semibold text-blue-700 underline">Create / view invoice</Link>
                   </div>
