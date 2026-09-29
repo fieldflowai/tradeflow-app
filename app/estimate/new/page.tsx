@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { generateLocalEstimate } from "@/lib/localEstimator";
+import { applyPriceBookRates } from "@/lib/priceBookPricing.mjs";
 
 interface LineItemInput {
   description: string;
@@ -27,6 +28,20 @@ interface EstimatePackage {
   total: number;
 }
 
+interface LocalEstimateDraft {
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  jobAddress: string;
+  trade: string;
+  requireDeposit: boolean;
+  depositPercentage: number;
+  promptText: string;
+  lineItems: LineItemInput[];
+  packageOptions: EstimatePackage[];
+  savedAt: string;
+}
+
 export default function CreateEstimatePage() {
   const router = useRouter();
 
@@ -45,6 +60,8 @@ export default function CreateEstimatePage() {
   // AI / Smart Generator Prompt State
   const [promptText, setPromptText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [draftMessage, setDraftMessage] = useState("");
+  const [draftStorageMessage, setDraftStorageMessage] = useState("");
 
   // Line Items
   const [lineItems, setLineItems] = useState<LineItemInput[]>([
@@ -57,6 +74,50 @@ export default function CreateEstimatePage() {
   const [packageOptions, setPackageOptions] = useState<EstimatePackage[]>([]);
 
   const [saving, setSaving] = useState(false);
+
+  const saveDraftOnDevice = () => {
+    const draft: LocalEstimateDraft = {
+      clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit,
+      depositPercentage, promptText, lineItems, packageOptions, savedAt: new Date().toISOString(),
+    };
+    try {
+      localStorage.setItem("tradeflow-unsent-estimate-v1", JSON.stringify(draft));
+      setDraftStorageMessage("Draft saved in this browser on this device. It includes customer contact details.");
+    } catch {
+      setDraftStorageMessage("This browser could not save the draft. Check available device storage.");
+    }
+  };
+
+  const restoreDraftFromDevice = () => {
+    try {
+      const saved = localStorage.getItem("tradeflow-unsent-estimate-v1");
+      if (!saved) {
+        setDraftStorageMessage("No saved draft found in this browser.");
+        return;
+      }
+      const draft = JSON.parse(saved) as Partial<LocalEstimateDraft>;
+      if (!Array.isArray(draft.lineItems) || !draft.lineItems.every((item) =>
+        item && typeof item.description === "string" && Number.isFinite(Number(item.quantity)) && Number.isFinite(Number(item.unit_price)))) {
+        throw new Error("Saved draft data is invalid.");
+      }
+      setClientName(draft.clientName ?? ""); setClientEmail(draft.clientEmail ?? "");
+      setClientPhone(draft.clientPhone ?? ""); setJobAddress(draft.jobAddress ?? "");
+      if (draft.trade) setTrade(draft.trade);
+      setRequireDeposit(isProSubscriber && draft.requireDeposit === true);
+      setDepositPercentage(Number(draft.depositPercentage) || 20);
+      setPromptText(draft.promptText ?? "");
+      setLineItems(draft.lineItems);
+      setPackageOptions(isProSubscriber && Array.isArray(draft.packageOptions) ? draft.packageOptions : []);
+      setDraftStorageMessage(`Draft restored${draft.savedAt ? ` (saved ${new Date(draft.savedAt).toLocaleString()})` : ""}.`);
+    } catch {
+      setDraftStorageMessage("Could not restore this saved draft. Save a new draft to replace it.");
+    }
+  };
+
+  const deleteDraftFromDevice = () => {
+    localStorage.removeItem("tradeflow-unsent-estimate-v1");
+    setDraftStorageMessage("Saved device draft removed.");
+  };
 
   useEffect(() => {
     const savedTemplate = sessionStorage.getItem("tradeflow-estimate-template");
@@ -94,6 +155,7 @@ export default function CreateEstimatePage() {
     setIsGenerating(true);
 
     try {
+      let draftedItems: LineItemInput[];
       if (isProSubscriber) {
         // PRO TIER: Call Gemini AI Server Route
         const res = await fetch("/api/generate-estimate", {
@@ -105,16 +167,19 @@ export default function CreateEstimatePage() {
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 
-        if (data.line_items && data.line_items.length > 0) {
-          setLineItems(data.line_items);
-        }
+        if (!Array.isArray(data.line_items) || data.line_items.length === 0) throw new Error("No usable line items were returned.");
+        draftedItems = data.line_items;
       } else {
         // FREE TIER: Execute Zero-Cost Local Catalog Engine
         // Simulate a minor 400ms delay for a smooth UI transition
         await new Promise((resolve) => setTimeout(resolve, 400));
-        const localItems = generateLocalEstimate(`${trade} ${promptText}`);
-        setLineItems(localItems);
+        draftedItems = generateLocalEstimate(`${trade} ${promptText}`);
       }
+      const priced = applyPriceBookRates(draftedItems, priceBookItems, trade, isProSubscriber);
+      setLineItems(priced.lines);
+      setDraftMessage(isProSubscriber
+        ? `${priced.matchedCount} line(s) matched your Price Book. Unmatched lines are $0 until you set your own rate.`
+        : `${priced.matchedCount} line(s) matched your Price Book. Other local prices are starter references; review them before sending.`);
       setPromptText("");
     } catch (err: any) {
       alert("Error generating estimate: " + err.message);
@@ -258,6 +323,18 @@ export default function CreateEstimatePage() {
             <span className="hidden sm:inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">Draft · Unsaved</span>
           </div>
 
+          <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h2 className="text-sm font-semibold text-slate-800">Unfinished estimate</h2><p className="mt-1 text-xs text-slate-600">Save or restore a draft in this browser on this device.</p></div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={saveDraftOnDevice} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Save on this device</button>
+                <button type="button" onClick={restoreDraftFromDevice} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Restore saved draft</button>
+                <button type="button" onClick={deleteDraftFromDevice} className="px-2 py-2 text-xs font-semibold text-red-700 underline">Clear saved draft</button>
+              </div>
+            </div>
+            {draftStorageMessage && <p role="status" className="mt-3 text-xs text-slate-600">{draftStorageMessage}</p>}
+          </section>
+
           {/* Client Details Section */}
           <div className="space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -350,7 +427,7 @@ export default function CreateEstimatePage() {
 
             <p className="text-xs text-slate-600">
               {isProSubscriber
-                ? "Describe any custom work or scope in free text. Gemini AI will generate structured line items, quantities, and rates."
+                ? "Describe the work and measurements. Gemini drafts the scope and quantities, then matching prices come from your Price Book; unmatched prices stay at $0 for you to fill in."
                 : "Describe the job and include measurements where you can. Trade-specific local rules draft common tasks and quantities; every line stays editable."}
             </p>
             {!isProSubscriber && (
@@ -376,6 +453,7 @@ export default function CreateEstimatePage() {
                 {isGenerating ? "Drafting..." : "Draft Line Items"}
               </button>
             </div>
+            {draftMessage && <p role="status" className="rounded-md border border-blue-200 bg-white/80 px-3 py-2 text-xs text-slate-700">{draftMessage}</p>}
           </div>
 
           {/* Scope of Work Table */}

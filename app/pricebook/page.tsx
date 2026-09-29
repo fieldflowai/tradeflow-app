@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { parsePriceBookCsv } from "@/lib/priceBookCsv.mjs";
+import type { ImportedPriceBookItem } from "@/lib/priceBookCsv.mjs";
 
 type PriceItem = { id: string; name: string; description: string; trade: string; unit: string; unit_price: number };
 type EstimateLine = { description: string; quantity: number; unit_price: number };
@@ -25,6 +27,8 @@ export default function PriceBookPage() {
   const [unit, setUnit] = useState("each");
   const [unitPrice, setUnitPrice] = useState("0");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [importRows, setImportRows] = useState<ImportedPriceBookItem[]>([]);
+  const [importing, setImporting] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -66,6 +70,49 @@ export default function PriceBookPage() {
     if (deleteError) setError(deleteError.message); else setItems((current) => current.filter((item) => item.id !== id));
   };
 
+  const selectImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    try {
+      const parsedRows = parsePriceBookCsv(await file.text());
+      setImportRows(parsedRows);
+      setError("");
+      setNotice(`Ready to import ${parsedRows.length} price book items. Review the file, then choose Import.`);
+    } catch (importError) {
+      setImportRows([]);
+      setError(importError instanceof Error ? importError.message : "Unable to read this CSV file.");
+    }
+  };
+
+  const importPriceBook = async () => {
+    if (!importRows.length) return;
+    setImporting(true); setError(""); setNotice("");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setError("Sign in to import price book items.");
+      setImporting(false);
+      return;
+    }
+
+    let imported = 0;
+    for (let index = 0; index < importRows.length; index += 100) {
+      const batch = importRows.slice(index, index + 100).map((item) => ({ ...item, user_id: user.id }));
+      const { error: insertError } = await supabase.from("price_book_items").insert(batch);
+      if (insertError) {
+        setError(imported ? `Imported ${imported} items. The rest failed: ${insertError.message}` : insertError.message);
+        setImporting(false);
+        await loadData();
+        return;
+      }
+      imported += batch.length;
+    }
+    setImportRows([]);
+    setNotice(`Imported ${imported} price book items.`);
+    setImporting(false);
+    await loadData();
+  };
+
   const useTemplate = (template: EstimateTemplate) => {
     sessionStorage.setItem("tradeflow-estimate-template", JSON.stringify(template));
     window.location.assign("/");
@@ -102,7 +149,16 @@ export default function PriceBookPage() {
               {editingId && <button type="button" onClick={() => { setEditingId(null); setName(""); setDescription(""); setUnitPrice("0"); }} className="w-full text-xs font-semibold text-slate-600 underline">Cancel edit</button>}
             </form>
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="border-b border-slate-200 p-5"><h2 className="font-semibold">Your rates</h2><p className="mt-1 text-xs text-slate-500">These are your business rates and can be edited on every estimate.</p></div>
+              <div className="border-b border-slate-200 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div><h2 className="font-semibold">Your rates</h2><p className="mt-1 text-xs text-slate-500">These are your business rates and can be edited on every estimate.</p></div>
+                  <div className="flex flex-wrap items-center gap-3 text-xs">
+                    <a download="tradeflow-pricebook-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent("name,description,trade,unit,unit_price\nFaucet installation,Standard faucet install,Plumbing,each,245.00")}`} className="font-semibold text-blue-700 underline">Download CSV template</a>
+                    <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Choose CSV<input type="file" accept=".csv,text/csv" onChange={(event) => void selectImportFile(event)} className="sr-only" /></label>
+                  </div>
+                </div>
+                {importRows.length > 0 && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-blue-50 p-3"><p className="text-xs text-blue-900">{importRows.length} rows ready to import.</p><div className="flex items-center gap-3"><button type="button" onClick={() => { setImportRows([]); setNotice(""); }} className="text-xs font-semibold text-slate-600 underline">Cancel</button><button type="button" disabled={importing} onClick={() => void importPriceBook()} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{importing ? "Importing…" : `Import ${importRows.length} items`}</button></div></div>}
+              </div>
               {loading ? <p className="p-8 text-center text-sm text-slate-500">Loading price book…</p> : items.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">Add your first labor or material rate.</p> : <div className="divide-y divide-slate-100">{items.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 p-4"><div><p className="font-semibold">{item.name}</p><p className="text-xs text-slate-500">{item.trade} · per {item.unit}{item.description ? ` · ${item.description}` : ""}</p></div><div className="flex items-center gap-3"><span className="font-semibold tabular-nums">${Number(item.unit_price).toFixed(2)}</span><button onClick={() => editItem(item)} className="text-xs font-semibold text-blue-700 underline">Edit</button><button onClick={() => void removeItem(item.id)} aria-label={`Delete ${item.name}`} className="text-xs font-semibold text-red-700 underline">Remove</button></div></div>)}</div>}
             </section>
           </div>

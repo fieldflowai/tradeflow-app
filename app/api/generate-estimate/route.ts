@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: `Create an editable first draft estimate for a ${trade} job. Job description: ${prompt}\n\nReturn JSON only with a line_items array. Each item must contain description (string), quantity (number), and unit_price (number). Break work into labor and materials where reasonably clear. Do not invent measurements or claim a price is local market pricing. If quantity or rate cannot be responsibly inferred, use 1 or 0 respectively and make the description say what needs confirmation. Use USD.` }] }],
+      contents: [{ role: "user", parts: [{ text: `Draft scope and quantities only for a ${trade} job. Job description: ${prompt}\n\nReturn JSON only with a line_items array. Each item must contain description (string), quantity (number), and unit_price (number). Always set unit_price to 0; TradeFlow will apply the contractor's saved Price Book rates where a clear match exists. Break work into distinct tasks and list labor/material work separately when clear. Do not invent measurements. If a quantity cannot be responsibly inferred, use 1 and say what needs confirmation in the description. Use concise descriptions that name the actual fixture, material, or task so it can be matched to a saved service.` }] }],
       generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2048 },
     }),
   });
@@ -42,9 +42,8 @@ export async function POST(request: Request) {
     const candidate = item as Record<string, unknown>;
     const description = typeof candidate.description === "string" ? candidate.description.trim().slice(0, 240) : "";
     const quantity = Number(candidate.quantity);
-    const unit_price = Number(candidate.unit_price);
-    if (!description || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unit_price) || unit_price < 0) return [];
-    return [{ description, quantity, unit_price }];
+    if (!description || !Number.isFinite(quantity) || quantity <= 0) return [];
+    return [{ description, quantity, unit_price: 0 }];
   }) : [];
   if (!line_items.length) return NextResponse.json({ error: "The AI returned no usable line items. Add scope details and try again." }, { status: 502 });
   return NextResponse.json({ line_items });
