@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { generateLocalEstimate } from "@/lib/localEstimator";
 import { applyPriceBookRates } from "@/lib/priceBookPricing.mjs";
+import { clearOfflineEstimateDraft, loadOfflineEstimateDraft, saveOfflineEstimateDraft } from "@/lib/offlineEstimateDraft";
 
 interface LineItemInput {
   description: string;
@@ -40,7 +41,11 @@ interface LocalEstimateDraft {
   lineItems: LineItemInput[];
   packageOptions: EstimatePackage[];
   savedAt: string;
+  taxRate: number;
+  markupPercentage: number;
 }
+
+interface EstimateAttachment { file: File; mediaType: "photo" | "voice"; }
 
 export default function CreateEstimatePage() {
   const router = useRouter();
@@ -56,6 +61,13 @@ export default function CreateEstimatePage() {
   const [trade, setTrade] = useState("Plumbing");
   const [requireDeposit, setRequireDeposit] = useState(false);
   const [depositPercentage, setDepositPercentage] = useState(20);
+  const [taxRate, setTaxRate] = useState(0);
+  const [markupPercentage, setMarkupPercentage] = useState(0);
+  const [attachments, setAttachments] = useState<EstimateAttachment[]>([]);
+  const [connectionOnline, setConnectionOnline] = useState(true);
+  const [recording, setRecording] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   // AI / Smart Generator Prompt State
   const [promptText, setPromptText] = useState("");
@@ -78,18 +90,23 @@ export default function CreateEstimatePage() {
   const saveDraftOnDevice = () => {
     const draft: LocalEstimateDraft = {
       clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit,
-      depositPercentage, promptText, lineItems, packageOptions, savedAt: new Date().toISOString(),
+      depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, savedAt: new Date().toISOString(),
     };
-    try {
-      localStorage.setItem("tradeflow-unsent-estimate-v1", JSON.stringify(draft));
-      setDraftStorageMessage("Draft saved in this browser on this device. It includes customer contact details.");
-    } catch {
-      setDraftStorageMessage("This browser could not save the draft. Check available device storage.");
-    }
+    void saveOfflineEstimateDraft(draft, attachments.map(({ file, mediaType }) => ({ name: file.name, type: file.type, mediaType, blob: file })))
+      .then(() => setDraftStorageMessage("Draft and attachments saved privately in this browser on this device. It includes customer contact details."))
+      .catch(() => setDraftStorageMessage("This browser could not save the draft. Check available device storage."));
   };
 
-  const restoreDraftFromDevice = () => {
+  const restoreDraftFromDevice = async () => {
     try {
+      const stored = await loadOfflineEstimateDraft<LocalEstimateDraft>();
+      if (stored) {
+        const draft = stored.fields;
+        restoreFields(draft);
+        setAttachments(stored.attachments.map((item) => ({ mediaType: item.mediaType, file: new File([item.blob], item.name, { type: item.type }) })));
+        setDraftStorageMessage(`Draft and ${stored.attachments.length} attachment(s) restored${stored.savedAt ? ` (saved ${new Date(stored.savedAt).toLocaleString()})` : ""}.`);
+        return;
+      }
       const saved = localStorage.getItem("tradeflow-unsent-estimate-v1");
       if (!saved) {
         setDraftStorageMessage("No saved draft found in this browser.");
@@ -100,24 +117,35 @@ export default function CreateEstimatePage() {
         item && typeof item.description === "string" && Number.isFinite(Number(item.quantity)) && Number.isFinite(Number(item.unit_price)))) {
         throw new Error("Saved draft data is invalid.");
       }
-      setClientName(draft.clientName ?? ""); setClientEmail(draft.clientEmail ?? "");
-      setClientPhone(draft.clientPhone ?? ""); setJobAddress(draft.jobAddress ?? "");
-      if (draft.trade) setTrade(draft.trade);
-      setRequireDeposit(isProSubscriber && draft.requireDeposit === true);
-      setDepositPercentage(Number(draft.depositPercentage) || 20);
-      setPromptText(draft.promptText ?? "");
-      setLineItems(draft.lineItems);
-      setPackageOptions(isProSubscriber && Array.isArray(draft.packageOptions) ? draft.packageOptions : []);
+      restoreFields(draft);
       setDraftStorageMessage(`Draft restored${draft.savedAt ? ` (saved ${new Date(draft.savedAt).toLocaleString()})` : ""}.`);
     } catch {
       setDraftStorageMessage("Could not restore this saved draft. Save a new draft to replace it.");
     }
   };
 
-  const deleteDraftFromDevice = () => {
-    localStorage.removeItem("tradeflow-unsent-estimate-v1");
-    setDraftStorageMessage("Saved device draft removed.");
+  const restoreFields = (draft: Partial<LocalEstimateDraft>) => {
+    setClientName(draft.clientName ?? ""); setClientEmail(draft.clientEmail ?? "");
+    setClientPhone(draft.clientPhone ?? ""); setJobAddress(draft.jobAddress ?? "");
+    if (draft.trade) setTrade(draft.trade);
+    setRequireDeposit(isProSubscriber && draft.requireDeposit === true);
+    setDepositPercentage(Number(draft.depositPercentage) || 20);
+    setPromptText(draft.promptText ?? "");
+    if (Array.isArray(draft.lineItems)) setLineItems(draft.lineItems);
+    setPackageOptions(isProSubscriber && Array.isArray(draft.packageOptions) ? draft.packageOptions : []);
+    setTaxRate(Number(draft.taxRate) || 0); setMarkupPercentage(Number(draft.markupPercentage) || 0);
   };
+
+  const deleteDraftFromDevice = () => {
+    void clearOfflineEstimateDraft().then(() => { localStorage.removeItem("tradeflow-unsent-estimate-v1"); setDraftStorageMessage("Saved device draft and attachments removed."); });
+  };
+
+  useEffect(() => {
+    const syncOnline = () => setConnectionOnline(navigator.onLine);
+    syncOnline();
+    window.addEventListener("online", syncOnline); window.addEventListener("offline", syncOnline);
+    return () => { window.removeEventListener("online", syncOnline); window.removeEventListener("offline", syncOnline); mediaStreamRef.current?.getTracks().forEach((track) => track.stop()); };
+  }, []);
 
   useEffect(() => {
     const savedTemplate = sessionStorage.getItem("tradeflow-estimate-template");
@@ -137,6 +165,8 @@ export default function CreateEstimatePage() {
     void (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        setTaxRate(Number(user.user_metadata?.tax_rate) || 0);
+        setMarkupPercentage(Number(user.user_metadata?.markup_percentage) || 0);
         const { data: plan } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
         const activePro = ["active", "trialing"].includes(plan?.status ?? "");
         setIsProSubscriber(activePro);
@@ -236,8 +266,30 @@ export default function CreateEstimatePage() {
     (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
     0
   );
+  const markupAmount = subtotal * markupPercentage / 100;
+  const taxAmount = (subtotal + markupAmount) * taxRate / 100;
+  const estimateTotal = subtotal + markupAmount + taxAmount;
+  const depositAmount = requireDeposit ? estimateTotal * (depositPercentage / 100) : 0;
 
-  const depositAmount = requireDeposit ? subtotal * (depositPercentage / 100) : 0;
+  const startVoiceNote = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") { setDraftMessage("Voice recording is not supported by this browser."); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      const recorder = new MediaRecorder(stream);
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        const extension = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
+        setAttachments((current) => [...current.filter((item) => item.mediaType !== "voice"), { mediaType: "voice", file: new File([blob], `field-note-${Date.now()}.${extension}`, { type: blob.type }) }]);
+        stream.getTracks().forEach((track) => track.stop()); mediaStreamRef.current = null; setRecording(false);
+      };
+      recorderRef.current = recorder; recorder.start(); setRecording(true);
+    } catch { setDraftMessage("Allow microphone access to record a field note."); }
+  };
+
+  const stopVoiceNote = () => { if (recorderRef.current?.state === "recording") recorderRef.current.stop(); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,7 +299,11 @@ export default function CreateEstimatePage() {
     }
 
     setSaving(true);
+    let createdEstimateId: string | null = null;
     try {
+      if (!navigator.onLine) throw new Error("You are offline. Save the draft on this device, then reconnect to create and upload it.");
+      const invalidAttachment = attachments.find(({ file, mediaType }) => file.size > (mediaType === "photo" ? 8 * 1024 * 1024 : 15 * 1024 * 1024));
+      if (invalidAttachment) throw new Error(`${invalidAttachment.file.name} exceeds the ${invalidAttachment.mediaType === "photo" ? "8 MB photo" : "15 MB voice note"} limit.`);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push("/login");
@@ -264,6 +320,8 @@ export default function CreateEstimatePage() {
               job_address: jobAddress,
               trade,
               package_options: packageOptions,
+              tax_rate: taxRate,
+              markup_percentage: markupPercentage,
               user_id: user.id,
             require_deposit: requireDeposit,
             deposit_percentage: depositPercentage,
@@ -274,6 +332,7 @@ export default function CreateEstimatePage() {
         .single();
 
       if (estError) throw estError;
+      createdEstimateId = est.id;
 
       // 2. Insert Line Items
       const formattedItems = lineItems.map((item) => ({
@@ -289,10 +348,20 @@ export default function CreateEstimatePage() {
 
       if (itemsError) throw itemsError;
 
+      for (const attachment of attachments) {
+        const path = `${user.id}/${est.id}/${crypto.randomUUID()}-${attachment.file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const { error: uploadError } = await supabase.storage.from("estimate-media").upload(path, attachment.file, { contentType: attachment.file.type, upsert: false });
+        if (uploadError) throw new Error(`Estimate saved but attachment upload failed: ${uploadError.message}`);
+        const { error: metadataError } = await supabase.from("estimate_attachments").insert({ estimate_id: est.id, user_id: user.id, storage_path: path, media_type: attachment.mediaType, content_type: attachment.file.type });
+        if (metadataError) throw new Error(`Estimate saved but attachment details failed: ${metadataError.message}`);
+      }
+
       // 3. Redirect to Client Share Portal
+      await clearOfflineEstimateDraft().catch(() => undefined);
+      localStorage.removeItem("tradeflow-unsent-estimate-v1");
       router.push(`/estimate/${est.id}`);
     } catch (err: any) {
-      alert("Error creating estimate: " + err.message);
+      alert(createdEstimateId ? `Estimate ${createdEstimateId} was created, but a later save step failed. Open it from your dashboard; do not create it again. Details: ${err.message}` : "Error creating estimate: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -310,6 +379,9 @@ export default function CreateEstimatePage() {
             </span>
           </div>
           {isProSubscriber ? <span className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-semibold text-green-300">Pro active</span> : <Link href="/profile" className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-medium text-slate-200 transition-colors hover:bg-slate-700">Upgrade to Pro</Link>}
+        </div>
+        <div role="status" className={`rounded-lg border px-4 py-2.5 text-xs ${connectionOnline ? "border-green-200 bg-green-50 text-green-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}>
+          {connectionOnline ? "Online · You can create estimates and upload field notes." : "Offline · You can edit and save drafts with photos and voice notes on this device. Reconnect to create the estimate."}
         </div>
 
         {/* Main Form */}
@@ -406,6 +478,26 @@ export default function CreateEstimatePage() {
               </div>
             </div>
           </div>
+
+          <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h2 className="text-sm font-semibold text-slate-900">Field photos & voice note</h2><p className="mt-1 text-xs text-slate-600">Attach up to 6 job photos and one recorded voice note. These are saved privately and only photos appear on the proposal.</p></div>
+              <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Add photos<input type="file" accept="image/jpeg,image/png,image/webp,image/heic" capture="environment" multiple className="sr-only" onChange={(event) => {
+                const selected = Array.from(event.target.files ?? []);
+                const photos = selected.filter((file) => file.type.startsWith("image/") && file.size <= 8 * 1024 * 1024);
+                setAttachments((current) => {
+                  const voiceNotes = current.filter((item) => item.mediaType !== "photo");
+                  const nextPhotos = [...current.filter((item) => item.mediaType === "photo").map((item) => item.file), ...photos].slice(0, 6);
+                  return [...voiceNotes, ...nextPhotos.map((file) => ({ file, mediaType: "photo" as const }))];
+                });
+                setDraftMessage(photos.length !== selected.length ? "Only supported photos up to 8 MB each were added." : selected.length > photos.length || attachments.filter((item) => item.mediaType === "photo").length + photos.length > 6 ? "Up to 6 photos can be attached." : "");
+                event.currentTarget.value = "";
+              }} /></label>
+              {recording ? <button type="button" onClick={stopVoiceNote} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white">Stop recording</button> : <button type="button" onClick={() => void startVoiceNote()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Record voice note</button>}
+            </div>
+            {recording && <p role="status" className="mt-3 text-xs font-medium text-red-700">Recording… Tap “Stop recording” to attach it.</p>}
+            {!!attachments.length && <ul className="mt-3 space-y-1.5">{attachments.map(({ file, mediaType }, index) => <li key={`${file.name}-${index}`} className="flex items-center justify-between rounded-md bg-white px-3 py-2 text-xs text-slate-700"><span>{mediaType === "photo" ? "Photo" : "Voice note"}: {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</span><button type="button" onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="font-semibold text-red-700 underline">Remove</button></li>)}</ul>}
+          </section>
 
           {/* Smart Draft Generator UI */}
           <div className={`p-4 rounded-xl border space-y-3 ${
@@ -554,6 +646,9 @@ export default function CreateEstimatePage() {
               <span className="text-slate-600">Subtotal:</span>
               <span className="font-bold text-slate-900">${subtotal.toFixed(2)}</span>
             </div>
+            {markupPercentage > 0 && <div className="flex justify-between text-sm text-slate-600"><span>Markup ({markupPercentage}%):</span><span>${markupAmount.toFixed(2)}</span></div>}
+            {taxRate > 0 && <div className="flex justify-between text-sm text-slate-600"><span>Tax ({taxRate}%):</span><span>${taxAmount.toFixed(2)}</span></div>}
+            <div className="flex justify-between border-t border-slate-200 pt-3 text-sm font-bold text-slate-900"><span>Estimate total:</span><span>${estimateTotal.toFixed(2)}</span></div>
 
             {requireDeposit && (
               <div className="flex justify-between items-center text-sm font-semibold text-green-700">
@@ -575,7 +670,7 @@ export default function CreateEstimatePage() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || !connectionOnline}
             className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl transition-colors shadow-sm disabled:opacity-50 text-sm"
           >
             {saving ? "Generating Share Link..." : "Save & Generate Client Proposal Link"}

@@ -20,7 +20,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const sender = process.env.RESEND_FROM_EMAIL;
   if (!apiKey || !sender) return NextResponse.json({ error: "Email sending is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL." }, { status: 503 });
 
-  const { data: estimate, error: estimateError } = await supabase.from("estimates").select("id, user_id, client_name, client_email, job_address").eq("id", id).eq("user_id", user.id).single();
+  const { data: estimate, error: estimateError } = await supabase.from("estimates").select("id, user_id, client_name, client_email, job_address, tax_rate, markup_percentage").eq("id", id).eq("user_id", user.id).single();
   if (estimateError || !estimate) return NextResponse.json({ error: "Estimate not found in your account." }, { status: 404 });
   const { data: items, error: itemsError } = await supabase.from("line_items").select("description, quantity, unit_price").eq("estimate_id", id);
   if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 500 });
@@ -32,16 +32,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return `<tr><td style="padding:10px;border-bottom:1px solid #e5e7eb">${escapeHtml(item.description)}</td><td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right">$${amount.toFixed(2)}</td></tr>`;
   }).join("");
   const safeName = escapeHtml(estimate.client_name || "there");
-  const total = (items ?? []).reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0), 0);
+  const subtotal = (items ?? []).reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0), 0);
+  const markup = subtotal * Number(estimate.markup_percentage || 0) / 100;
+  const tax = (subtotal + markup) * Number(estimate.tax_rate || 0) / 100;
+  const total = subtotal + markup + tax;
+  const businessName = typeof user.user_metadata?.business_name === "string" && user.user_metadata.business_name.trim() ? user.user_metadata.business_name.trim() : "your contractor";
+  const brandColor = typeof user.user_metadata?.brand_color === "string" && /^#[0-9a-f]{6}$/i.test(user.user_metadata.brand_color) ? user.user_metadata.brand_color : "#c85b2d";
+  const logoUrl = typeof user.user_metadata?.logo_url === "string" && user.user_metadata.logo_url.startsWith("https://") ? `<img src="${escapeHtml(user.user_metadata.logo_url)}" alt="" style="max-height:56px;max-width:180px">` : "";
   const emailResponse = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       from: sender,
       to: [estimate.client_email],
-      subject: `Your TradeFlow estimate from ${user.user_metadata?.business_name || "your contractor"}`,
+      subject: `Your estimate from ${businessName}`,
       text: `Hi ${estimate.client_name}, your estimate is ready. View it here: ${link}`,
-      html: `<div style="font-family:Arial,sans-serif;color:#1d2925;max-width:640px;margin:auto"><h1 style="font-size:22px">Your estimate is ready</h1><p>Hi ${safeName},</p><p>Here is the estimate for ${escapeHtml(estimate.job_address || "your project")}.</p><table style="border-collapse:collapse;width:100%">${rows}<tr><td style="padding:12px;font-weight:bold">Estimate total</td><td style="padding:12px;text-align:right;font-weight:bold">$${total.toFixed(2)}</td></tr></table><p style="margin:24px 0"><a href="${link}" style="background:#c85b2d;color:white;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Review estimate</a></p><p style="font-size:12px;color:#68736c">Sent with TradeFlow</p></div>`,
+      html: `<div style="font-family:Arial,sans-serif;color:#1d2925;max-width:640px;margin:auto">${logoUrl}<h1 style="font-size:22px;color:${brandColor}">${escapeHtml(businessName)} · Your estimate is ready</h1><p>Hi ${safeName},</p><p>Here is the estimate for ${escapeHtml(estimate.job_address || "your project")}.</p><table style="border-collapse:collapse;width:100%">${rows}<tr><td style="padding:10px">Subtotal</td><td style="padding:10px;text-align:right">$${subtotal.toFixed(2)}</td></tr>${markup ? `<tr><td style="padding:10px">Markup (${Number(estimate.markup_percentage)}%)</td><td style="padding:10px;text-align:right">$${markup.toFixed(2)}</td></tr>` : ""}${tax ? `<tr><td style="padding:10px">Tax (${Number(estimate.tax_rate)}%)</td><td style="padding:10px;text-align:right">$${tax.toFixed(2)}</td></tr>` : ""}<tr><td style="padding:12px;font-weight:bold">Estimate total</td><td style="padding:12px;text-align:right;font-weight:bold">$${total.toFixed(2)}</td></tr></table><p style="margin:24px 0"><a href="${link}" style="background:${brandColor};color:white;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Review estimate</a></p><p style="font-size:12px;color:#68736c">Sent with TradeFlow</p></div>`,
     }),
   });
   const responseData = await emailResponse.json();

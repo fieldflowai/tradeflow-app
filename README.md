@@ -2,13 +2,17 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## TradeFlow business features
 
-The app includes contractor price books and estimate templates, a scheduled job board with status tracking and actual job costs, estimate and job reports with gross profit, printable proposals/invoices, customer approval capture, Good/Better/Best proposal options, Pro subscriptions, cloud estimate drafting, branded estimate email, and automatic follow-up scheduling.
+The app includes contractor price books and estimate templates, a scheduled job board with status tracking and actual job costs, estimate and job reports with gross profit, printable proposals/invoices, customer approval capture and proposal questions, Good/Better/Best options, contractor branding and default markup/tax settings, private job voice notes, proposal photos, Pro subscriptions, cloud estimate drafting, branded estimate email, and automatic follow-up scheduling. Estimate drafts and media can be saved in browser storage for offline editing on that device; creating/syncing the estimate requires a connection.
 
 ### Supabase setup
 
 Apply [`supabase/migrations/202609270001_tradeflow_operations.sql`](supabase/migrations/202609270001_tradeflow_operations.sql) to the Supabase project before using the new price book, templates, jobs, reporting, subscription, and email tracking features. The migration adds row-level policies for the new user-owned tables and extra columns to the existing `estimates` table.
 
 Before production, also review and apply [`supabase/migrations/202609280001_lock_down_estimates.sql`](supabase/migrations/202609280001_lock_down_estimates.sql). Back up the database and identify estimates with a null `user_id` first; those records cannot be assigned to a contractor automatically. The migration removes existing policies on `estimates` and `line_items` and replaces them with owner-only policies. Proposal links are served through a limited server endpoint after this deploy.
+
+Apply [`supabase/migrations/202609290001_proposals_field_tools.sql`](supabase/migrations/202609290001_proposals_field_tools.sql) in Supabase SQL Editor after the earlier migrations. It adds estimate tax/markup snapshots, customer-question storage and policies, private estimate attachment records, and the private `estimate-media` Storage bucket/policies. The app changes depend on this migration; photo/audio upload and customer questions will fail until it is applied. In Profile & Preferences, contractors can add their business name, phone, address, public HTTPS logo URL, proposal accent color, and default tax/markup percentages. Verify logo URLs are publicly reachable over HTTPS. Tax calculations apply the entered percentage to subtotal plus markup; selected Good/Better/Best package totals are treated as already-marked-up prices and receive tax only. Contractors must confirm local taxability and rates.
+
+Photos are shared on the customer proposal; voice recordings remain visible only to the signed-in contractor. Device drafts, including customer details and media, remain in that browser's IndexedDB and are not synced between devices. Clear them from the estimate form when no longer needed.
 
 ### Pro integrations
 

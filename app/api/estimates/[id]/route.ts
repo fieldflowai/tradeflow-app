@@ -61,7 +61,14 @@ export async function GET(
     return jsonError("Unable to load estimate line items.", 500);
   }
 
-  return NextResponse.json({ estimate, lineItems: lineItems ?? [] }, {
+  const { data: attachmentRows } = await supabase.from("estimate_attachments")
+    .select("id, storage_path, media_type, content_type, created_at").eq("estimate_id", id).eq("user_id", user.id);
+  const attachments = await Promise.all((attachmentRows ?? []).map(async (attachment) => {
+    const { data } = await supabase.storage.from("estimate-media").createSignedUrl(attachment.storage_path, 60 * 60);
+    return data?.signedUrl ? { id: attachment.id, media_type: attachment.media_type, content_type: attachment.content_type, created_at: attachment.created_at, url: data.signedUrl } : null;
+  }));
+
+  return NextResponse.json({ estimate, lineItems: lineItems ?? [], attachments: attachments.filter(Boolean) }, {
     headers: { "Cache-Control": "private, no-store" },
   });
 }
@@ -91,10 +98,16 @@ export async function PUT(
   const clientPhone = typeof body.client_phone === "string" ? body.client_phone.trim() : "";
   const jobAddress = typeof body.job_address === "string" ? body.job_address.trim() : "";
   const depositPercentage = Number(body.deposit_percentage);
+  const taxRate = Number(body.tax_rate);
+  const markupPercentage = Number(body.markup_percentage);
   if (!clientName || clientName.length > 200 || !clientEmail || clientEmail.length > 320 ||
       clientPhone.length > 80 || jobAddress.length > 500 || !validLineItems(body.lineItems) ||
       !Number.isFinite(depositPercentage) || depositPercentage < 0 || depositPercentage > 100) {
     return jsonError("Check the customer details, deposit percentage, and line items.", 400);
+  }
+  if ((body.tax_rate !== undefined && (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100)) ||
+      (body.markup_percentage !== undefined && (!Number.isFinite(markupPercentage) || markupPercentage < 0 || markupPercentage > 500))) {
+    return jsonError("Tax must be between 0 and 100%, and markup between 0 and 500%.", 400);
   }
 
   const { data: existing, error: lookupError } = await supabase
@@ -121,6 +134,8 @@ export async function PUT(
     status: "pending",
     updated_at: new Date().toISOString(),
   };
+  if (body.tax_rate !== undefined) estimateUpdate.tax_rate = taxRate;
+  if (body.markup_percentage !== undefined) estimateUpdate.markup_percentage = markupPercentage;
   if (typeof body.trade === "string") estimateUpdate.trade = body.trade.slice(0, 80);
 
   const { error: updateError } = await supabase

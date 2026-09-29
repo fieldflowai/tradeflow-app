@@ -19,12 +19,18 @@ interface Estimate {
   status: string;
   require_deposit: boolean;
   deposit_percentage: number;
+  tax_rate: number;
+  markup_percentage: number;
   created_at: string;
   package_options?: EstimatePackage[];
   signature_name?: string | null;
   selected_package?: string | null;
   accepted_at?: string | null;
 }
+
+interface ContractorBrand { businessName: string; phone: string; address: string; logoUrl: string; brandColor: string; }
+interface ProposalPhoto { id: string; url: string; }
+interface OwnerAttachment { id: string; media_type: "photo" | "voice"; url: string; }
 
 interface EstimatePackage {
   name: string;
@@ -44,6 +50,15 @@ export default function ClientEstimatePage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
   const [signatureName, setSignatureName] = useState("");
+  const [contractor, setContractor] = useState<ContractorBrand>({ businessName: "Your Contractor", phone: "", address: "", logoUrl: "", brandColor: "#c85b2d" });
+  const [photos, setPhotos] = useState<ProposalPhoto[]>([]);
+  const [ownerAttachments, setOwnerAttachments] = useState<OwnerAttachment[]>([]);
+  const [questionName, setQuestionName] = useState("");
+  const [questionEmail, setQuestionEmail] = useState("");
+  const [questionMessage, setQuestionMessage] = useState("");
+  const [questionStatus, setQuestionStatus] = useState("");
+  const [sendingQuestion, setSendingQuestion] = useState(false);
+  const [questionHoneypot, setQuestionHoneypot] = useState("");
 
   useEffect(() => {
     async function fetchEstimateDetails() {
@@ -56,6 +71,15 @@ export default function ClientEstimatePage() {
         const estData = result.estimate as Estimate;
 
         setEstimate(estData);
+        if (result.contractor) setContractor(result.contractor as ContractorBrand);
+        if (Array.isArray(result.photos)) setPhotos(result.photos as ProposalPhoto[]);
+        try {
+          const ownerResponse = await fetch(`/api/estimates/${encodeURIComponent(id)}`, { cache: "no-store" });
+          if (ownerResponse.ok) {
+            const ownerData = await ownerResponse.json();
+            if (Array.isArray(ownerData.attachments)) setOwnerAttachments(ownerData.attachments as OwnerAttachment[]);
+          }
+        } catch { /* Customer proposal access does not depend on owner-only recordings. */ }
         setSignatureName(estData.signature_name || "");
         const savedPackageIndex = Array.isArray(estData.package_options) ? estData.package_options.findIndex((option: EstimatePackage) => option.name === estData.selected_package) : -1;
         if (savedPackageIndex >= 0) setSelectedPackage(savedPackageIndex);
@@ -80,10 +104,25 @@ export default function ClientEstimatePage() {
   const subtotal = selectedPackage !== null && estimate?.package_options?.[selectedPackage]
     ? Number(estimate.package_options[selectedPackage].total)
     : lineItemTotal;
+  const markupAmount = selectedPackage === null ? subtotal * Number(estimate?.markup_percentage || 0) / 100 : 0;
+  const taxAmount = (subtotal + markupAmount) * Number(estimate?.tax_rate || 0) / 100;
+  const total = subtotal + markupAmount + taxAmount;
 
-  const depositAmount = estimate?.require_deposit
-    ? subtotal * ((estimate.deposit_percentage || 0) / 100)
-    : 0;
+  const depositAmount = estimate?.require_deposit ? total * ((estimate.deposit_percentage || 0) / 100) : 0;
+
+  const sendQuestion = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setSendingQuestion(true); setQuestionStatus("");
+    try {
+      const response = await fetch(`/api/proposals/${encodeURIComponent(id)}/questions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: questionName, email: questionEmail, message: questionMessage, company_website: questionHoneypot }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Your question could not be sent.");
+      setQuestionStatus(result.emailSent
+        ? "Your question was sent to the contractor. They can reply to your email address."
+        : "Your question was saved. The contractor can see it in TradeFlow; email notification is not currently available.");
+      setQuestionName(""); setQuestionEmail(""); setQuestionMessage("");
+    } catch (error) { setQuestionStatus(error instanceof Error ? error.message : "Your question could not be sent."); }
+    finally { setSendingQuestion(false); }
+  };
 
   const handleApproveAndPay = async () => {
     if (signatureName.trim().length < 2) {
@@ -181,7 +220,10 @@ export default function ClientEstimatePage() {
           {/* Proposal Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 gap-2">
             <div>
-              <h1 className="text-xl font-bold text-slate-900">Service Estimate</h1>
+              <div className="flex items-center gap-3">
+                {contractor.logoUrl && <img src={contractor.logoUrl} alt={`${contractor.businessName} logo`} className="h-12 max-w-32 object-contain" />}
+                <div><h1 className="text-xl font-bold" style={{ color: contractor.brandColor }}>{contractor.businessName}</h1><p className="text-sm font-semibold text-slate-900">Service Estimate</p>{contractor.phone && <p className="text-xs text-slate-600">{contractor.phone}</p>}{contractor.address && <p className="text-xs text-slate-600">{contractor.address}</p>}</div>
+              </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 Created on {new Date(estimate.created_at).toLocaleDateString()}
               </p>
@@ -190,11 +232,14 @@ export default function ClientEstimatePage() {
               <span className="text-xs font-semibold text-slate-400 block uppercase tracking-wider">
                 Total Estimate
               </span>
-              <span className="text-2xl font-black text-slate-900">
-                ${subtotal.toFixed(2)}
+                <span className="text-2xl font-black text-slate-900">
+                ${total.toFixed(2)}
               </span>
             </div>
           </div>
+
+          {photos.length > 0 && <section className="space-y-3"><h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Job photos</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{photos.map((photo) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer"><img src={photo.url} alt="Job site" className="h-36 w-full rounded-lg border border-slate-200 object-cover" /></a>)}</div></section>}
+          {ownerAttachments.some((item) => item.media_type === "voice") && <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4"><h2 className="text-xs font-bold uppercase tracking-wider text-amber-900">Private contractor voice notes</h2>{ownerAttachments.filter((item) => item.media_type === "voice").map((item) => <audio key={item.id} controls src={item.url} className="w-full" />)}<p className="text-[11px] text-amber-900">Only signed-in account owners can load these recordings.</p></section>}
 
           <div className="flex justify-end print:hidden">
             <button type="button" onClick={() => window.print()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Print / Save PDF</button>
@@ -202,7 +247,7 @@ export default function ClientEstimatePage() {
 
           {estimate.package_options?.length ? (
             <section className="space-y-3">
-              <div><h2 className="text-sm font-semibold text-slate-900">Choose the option that fits your home</h2><p className="mt-1 text-xs text-slate-500">Select one package to approve.</p></div>
+              <div><h2 className="text-sm font-semibold text-slate-900">Choose the option that fits your home</h2><p className="mt-1 text-xs text-slate-500">Select one package to approve. Package totals are treated as final pre-tax prices; default markup is not added a second time. Applicable tax is added below.</p></div>
               <div className="grid gap-3 md:grid-cols-3">
                 {estimate.package_options.map((option, index) => (
                   <button key={`${option.name}-${index}`} type="button" onClick={() => setSelectedPackage(index)} className={`rounded-xl border p-4 text-left transition ${selectedPackage === index ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200 bg-white hover:border-slate-400"}`}>
@@ -281,6 +326,9 @@ export default function ClientEstimatePage() {
               <span>Subtotal</span>
               <span className="font-semibold text-slate-900">${subtotal.toFixed(2)}</span>
             </div>
+            {markupAmount > 0 && <div className="flex justify-between items-center text-slate-600"><span>Markup ({estimate.markup_percentage}%)</span><span>${markupAmount.toFixed(2)}</span></div>}
+            {taxAmount > 0 && <div className="flex justify-between items-center text-slate-600"><span>Tax ({estimate.tax_rate}%)</span><span>${taxAmount.toFixed(2)}</span></div>}
+            <div className="flex justify-between items-center border-t border-slate-200 pt-2 font-bold text-slate-900"><span>Total</span><span>${total.toFixed(2)}</span></div>
 
             {estimate.require_deposit && (
               <div className="flex justify-between items-center text-green-700 font-semibold pt-2 border-t border-slate-200">
@@ -289,6 +337,18 @@ export default function ClientEstimatePage() {
               </div>
             )}
           </div>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <h2 className="text-sm font-bold text-slate-900">Have a question about this proposal?</h2>
+            <p className="mt-1 text-xs text-slate-600">Send it directly to {contractor.businessName}. Your email will be used so they can reply.</p>
+            <form onSubmit={sendQuestion} className="mt-3 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-medium text-slate-700">Your name<input required maxLength={160} autoComplete="name" value={questionName} onChange={(event) => setQuestionName(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /></label><label className="text-xs font-medium text-slate-700">Email<input required type="email" maxLength={320} autoComplete="email" value={questionEmail} onChange={(event) => setQuestionEmail(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /></label></div>
+              <label className="block text-xs font-medium text-slate-700">Question<textarea required minLength={5} maxLength={2000} rows={3} value={questionMessage} onChange={(event) => setQuestionMessage(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /></label>
+              <label className="hidden" aria-hidden="true">Website<input tabIndex={-1} autoComplete="off" value={questionHoneypot} onChange={(event) => setQuestionHoneypot(event.target.value)} /></label>
+              <button type="submit" disabled={sendingQuestion} className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: contractor.brandColor }}>{sendingQuestion ? "Sending…" : "Send question"}</button>
+              {questionStatus && <p role="status" className="text-xs text-slate-700">{questionStatus}</p>}
+            </form>
+          </section>
 
           {/* Client Action Button */}
           {estimate.status === "paid" ? (

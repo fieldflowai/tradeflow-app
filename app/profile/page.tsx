@@ -13,6 +13,11 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
+  const [businessAddress, setBusinessAddress] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [brandColor, setBrandColor] = useState("#c85b2d");
+  const [taxRate, setTaxRate] = useState("0");
+  const [markupPercentage, setMarkupPercentage] = useState("0");
   const [planStatus, setPlanStatus] = useState("free");
   const [upgrading, setUpgrading] = useState(false);
 
@@ -32,6 +37,11 @@ export default function ProfilePage() {
         setFullName(user.user_metadata?.full_name ?? "");
         setBusinessName(user.user_metadata?.business_name ?? "");
         setPhone(user.user_metadata?.phone ?? "");
+        setBusinessAddress(user.user_metadata?.business_address ?? "");
+        setLogoUrl(user.user_metadata?.logo_url ?? "");
+        setBrandColor(user.user_metadata?.brand_color ?? "#c85b2d");
+        setTaxRate(String(user.user_metadata?.tax_rate ?? 0));
+        setMarkupPercentage(String(user.user_metadata?.markup_percentage ?? 0));
         const { data: plan } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
         if (plan) setPlanStatus(plan.status);
       }
@@ -52,6 +62,11 @@ export default function ProfilePage() {
         full_name: fullName,
         business_name: businessName,
         phone: phone,
+        business_address: businessAddress.trim(),
+        logo_url: logoUrl.trim(),
+        brand_color: /^#[0-9a-f]{6}$/i.test(brandColor) ? brandColor : "#c85b2d",
+        tax_rate: Math.min(100, Math.max(0, Number(taxRate) || 0)),
+        markup_percentage: Math.min(500, Math.max(0, Number(markupPercentage) || 0)),
       },
     });
 
@@ -78,7 +93,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
+      <div className="max-w-3xl mx-auto p-6">
         <div className="h-8 w-48 bg-slate-200 animate-pulse rounded mb-4" />
         <div className="h-64 bg-slate-100 animate-pulse rounded-xl" />
       </div>
@@ -153,6 +168,27 @@ export default function ProfilePage() {
               className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm"
               suppressHydrationWarning
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Business address</label>
+            <input type="text" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="Street, city, state, ZIP" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Public logo URL (optional)</label>
+            <input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://your-site.com/logo.png" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Proposal accent color</label>
+            <div className="flex gap-2"><input type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className="h-10 w-14 rounded border border-slate-200" /><input type="text" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} pattern="^#[0-9A-Fa-f]{6}$" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm" /></div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <h2 className="text-sm font-semibold text-slate-900">Default estimate pricing</h2>
+          <p className="mt-1 text-xs text-slate-600">Applied to new estimates as a starting point. Tax rules vary by location; confirm what is taxable with your tax professional.</p>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="text-xs font-medium text-slate-700">Markup (%)<input type="number" min="0" max="500" step="0.01" value={markupPercentage} onChange={(e) => setMarkupPercentage(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm" /></label>
+            <label className="text-xs font-medium text-slate-700">Sales tax (%)<input type="number" min="0" max="100" step="0.001" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm" /></label>
           </div>
         </div>
 

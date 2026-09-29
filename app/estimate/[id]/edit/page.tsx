@@ -32,6 +32,8 @@ export default function EditEstimatePage() {
   const [jobAddress, setJobAddress] = useState("");
   const [requireDeposit, setRequireDeposit] = useState(true);
   const [depositPercentage, setDepositPercentage] = useState(20);
+  const [taxRate, setTaxRate] = useState(0);
+  const [markupPercentage, setMarkupPercentage] = useState(0);
 
   // Line Items State
   const [lineItems, setLineItems] = useState<LineItemInput[]>([]);
@@ -56,6 +58,8 @@ export default function EditEstimatePage() {
         setClientEmail(estimate.client_email || "");
         setClientPhone(estimate.client_phone || "");
         setJobAddress(estimate.job_address || "");
+        setTaxRate(Number(estimate.tax_rate) || 0);
+        setMarkupPercentage(Number(estimate.markup_percentage) || 0);
         const { data: { user } } = await supabase.auth.getUser();
         const { data: plan } = user ? await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle() : { data: null };
         const activePro = ["active", "trialing"].includes(plan?.status ?? "");
@@ -125,6 +129,8 @@ export default function EditEstimatePage() {
           job_address: jobAddress,
           require_deposit: requireDeposit,
           deposit_percentage: depositPercentage,
+          tax_rate: taxRate,
+          markup_percentage: markupPercentage,
           package_options: isPro ? packageOptions : [],
           lineItems,
         }),
@@ -230,6 +236,13 @@ export default function EditEstimatePage() {
               </div>
             </div>
           </div>
+
+          {/* Line Items Editor */}
+          <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h2 className="text-sm font-semibold text-slate-900">Estimate pricing</h2>
+            <p className="mt-1 text-xs text-slate-600">Markup is applied before sales tax. Check local tax rules for taxable labor and materials.</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-xs font-medium text-slate-700">Markup (%)<input type="number" min="0" max="500" step="0.01" value={markupPercentage} onChange={(event) => setMarkupPercentage(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" /></label><label className="text-xs font-medium text-slate-700">Sales tax (%)<input type="number" min="0" max="100" step="0.001" value={taxRate} onChange={(event) => setTaxRate(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" /></label></div>
+          </section>
 
           {/* Line Items Editor */}
           <div className="space-y-3">
