@@ -13,7 +13,6 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
-  const [defaultLaborRate, setDefaultLaborRate] = useState("75");
   const [planStatus, setPlanStatus] = useState("free");
   const [upgrading, setUpgrading] = useState(false);
 
@@ -33,7 +32,6 @@ export default function ProfilePage() {
         setFullName(user.user_metadata?.full_name ?? "");
         setBusinessName(user.user_metadata?.business_name ?? "");
         setPhone(user.user_metadata?.phone ?? "");
-        setDefaultLaborRate(user.user_metadata?.default_labor_rate ?? "75");
         const { data: plan } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
         if (plan) setPlanStatus(plan.status);
       }
@@ -54,7 +52,6 @@ export default function ProfilePage() {
         full_name: fullName,
         business_name: businessName,
         phone: phone,
-        default_labor_rate: defaultLaborRate,
       },
     });
 
@@ -130,7 +127,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
+          <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-slate-700 mb-1">
               Full Name
             </label>
@@ -169,20 +166,6 @@ export default function ProfilePage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="(555) 000-0000"
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm"
-              suppressHydrationWarning
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              Default Labor Rate ($/hr)
-            </label>
-            <input
-              type="number"
-              value={defaultLaborRate}
-              onChange={(e) => setDefaultLaborRate(e.target.value)}
-              placeholder="75"
               className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm"
               suppressHydrationWarning
             />
