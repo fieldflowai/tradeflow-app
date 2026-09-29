@@ -8,6 +8,8 @@ The app includes contractor price books and estimate templates, a scheduled job 
 
 Apply [`supabase/migrations/202609270001_tradeflow_operations.sql`](supabase/migrations/202609270001_tradeflow_operations.sql) to the Supabase project before using the new price book, templates, jobs, reporting, subscription, and email tracking features. The migration adds row-level policies for the new user-owned tables and extra columns to the existing `estimates` table.
 
+Before production, also review and apply [`supabase/migrations/202609280001_lock_down_estimates.sql`](supabase/migrations/202609280001_lock_down_estimates.sql). Back up the database and identify estimates with a null `user_id` first; those records cannot be assigned to a contractor automatically. The migration removes existing policies on `estimates` and `line_items` and replaces them with owner-only policies. Proposal links are served through a limited server endpoint after this deploy.
+
 ### Pro integrations
 
 Copy `.env.example` to `.env.local` and set the values for integrations you enable:
@@ -17,8 +19,13 @@ Copy `.env.example` to `.env.local` and set the values for integrations you enab
 - Branded email and follow-ups: `RESEND_API_KEY` and `RESEND_FROM_EMAIL`, using a sender domain verified with Resend.
 - Scheduled follow-ups: configure a scheduler to POST `/api/cron/followups` with `Authorization: Bearer <CRON_SECRET>`. The app schedules a follow-up seven days after sending an estimate email; the scheduler runs due messages.
 - Set `SUPABASE_SERVICE_ROLE_KEY` for signed customer approvals, proposal view tracking, Stripe webhooks, and the follow-up worker. Keep this key private and server-side.
+- In Vercel Production environment variables, set `NEXT_PUBLIC_APP_URL=https://tradeflow-app-ai.vercel.app` and set `NEXT_PUBLIC_SUPPORT_EMAIL` to a real monitored support address. Do not set a public-prefixed variable to secret-only visibility.
+- For Supabase Auth email, configure a verified sender and custom SMTP in the Supabase dashboard. For Resend SMTP use host `smtp.resend.com`, port `587`, username `resend`, and the Resend API key as the password. Keep credentials in the Supabase dashboard, not Git.
+- In Supabase Auth URL Configuration, set Site URL to `https://tradeflow-app-ai.vercel.app` and allow the production confirmation redirect `https://tradeflow-app-ai.vercel.app/auth/confirm`.
 
 The app reads subscription state from Stripe webhook updates. Pro tools stay locked until the webhook records an active or trialing subscription.
+
+Customer down payments are temporarily unavailable until Stripe Connect onboarding, contractor payouts, and connected-account webhooks are implemented and verified. Stripe subscriptions for TradeFlow Pro are separate and remain available.
 
 ## Getting Started
 

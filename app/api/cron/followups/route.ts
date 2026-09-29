@@ -1,12 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { getTrustedAppOrigin } from "@/lib/security.mjs";
 
 export async function POST(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const resendKey = process.env.RESEND_API_KEY;
   const sender = process.env.RESEND_FROM_EMAIL;
+  const appOrigin = getTrustedAppOrigin(process.env.NEXT_PUBLIC_APP_URL);
   if (!cronSecret || !serviceKey || !resendKey || !sender) return NextResponse.json({ error: "Follow-up service is not configured." }, { status: 503 });
+  if (!appOrigin) return NextResponse.json({ error: "Set NEXT_PUBLIC_APP_URL to the production app URL." }, { status: 503 });
   if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } });
@@ -15,8 +18,7 @@ export async function POST(request: Request) {
 
   let sent = 0;
   for (const estimate of due ?? []) {
-    const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-    const link = `${origin}/estimate/${encodeURIComponent(estimate.id)}`;
+    const link = `${appOrigin}/estimate/${encodeURIComponent(estimate.id)}`;
     const result = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },

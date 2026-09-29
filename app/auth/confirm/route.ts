@@ -1,10 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { safeInternalRedirect } from "@/lib/security.mjs";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+  const next = safeInternalRedirect(searchParams.get("next"));
 
   if (code) {
     const supabaseResponse = NextResponse.redirect(new URL(next, request.url));

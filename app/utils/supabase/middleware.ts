@@ -44,6 +44,7 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/pricebook") ||
     path.startsWith("/reports") ||
     path.startsWith("/invoice") ||
+    path === "/estimate/new" ||
     (path.startsWith("/estimate") && path.endsWith("/edit"));
 
   if (!user && isProtectedRoute) {

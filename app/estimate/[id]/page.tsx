@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
 interface LineItem {
   id: string;
@@ -51,17 +50,10 @@ export default function ClientEstimatePage() {
       if (!id) return;
       setLoading(true);
       try {
-        // Fetch estimate details
-        const { data: estData, error: estError } = await supabase
-          .from("estimates")
-          .select("*")
-          .eq("id", id)
-          .single();
-
-        if (estError || !estData) {
-          setErrorMsg("Estimate not found or link has expired.");
-          return;
-        }
+        const response = await fetch(`/api/proposals/${encodeURIComponent(id)}`, { cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Estimate not found or link has expired.");
+        const estData = result.estimate as Estimate;
 
         setEstimate(estData);
         setSignatureName(estData.signature_name || "");
@@ -69,14 +61,7 @@ export default function ClientEstimatePage() {
         if (savedPackageIndex >= 0) setSelectedPackage(savedPackageIndex);
         void fetch(`/api/estimates/${id}/view`, { method: "POST" });
 
-        // Fetch associated line items
-        const { data: itemData, error: itemError } = await supabase
-          .from("line_items")
-          .select("*")
-          .eq("estimate_id", id);
-
-        if (itemError) throw itemError;
-        setLineItems(itemData || []);
+        setLineItems(result.lineItems || []);
       } catch (err: any) {
         console.error("Error loading proposal:", err.message);
         setErrorMsg("Failed to load estimate details.");
@@ -116,26 +101,7 @@ export default function ClientEstimatePage() {
       if (!approval.ok) throw new Error(approvalData.error || "Approval could not be recorded.");
       setEstimate((current) => current ? { ...current, signature_name: signatureName.trim(), selected_package: selectedPackage === null ? null : estimate?.package_options?.[selectedPackage]?.name, accepted_at: new Date().toISOString(), status: "accepted" } : current);
 
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          estimateId: estimate?.id,
-          amount: depositAmount > 0 ? depositAmount : subtotal,
-          clientEmail: estimate?.client_email,
-          clientName: estimate?.client_name,
-          selectedPackage: selectedPackage === null ? null : estimate?.package_options?.[selectedPackage]?.name,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        alert("Payment initialization failed: " + (data.error || "Unknown error"));
-        setPaying(false);
-      }
+      setPaying(false);
     } catch (err: any) {
       alert("Error processing approval: " + err.message);
       setPaying(false);
@@ -329,6 +295,10 @@ export default function ClientEstimatePage() {
             <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl text-center font-semibold text-sm">
               ✓ Deposit Paid & Proposal Accepted
             </div>
+          ) : estimate.status === "accepted" ? (
+            <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl text-center font-semibold text-sm">
+              ✓ Your approval has been recorded. The contractor will contact you about payment and next steps.
+            </div>
           ) : (
             <>
               <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -345,9 +315,9 @@ export default function ClientEstimatePage() {
               className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3.5 rounded-xl transition-colors shadow-sm disabled:opacity-50 text-sm"
             >
               {paying
-                ? "Connecting to Payment Portal..."
+                ? "Recording Approval..."
                 : estimate.require_deposit
-                ? `Approve & Pay Deposit ($${depositAmount.toFixed(2)})`
+                ? `Approve Estimate · Deposit Due Later ($${depositAmount.toFixed(2)})`
                 : `Approve Proposal ($${subtotal.toFixed(2)})`}
             </button>
             </>
