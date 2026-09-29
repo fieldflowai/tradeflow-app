@@ -7,9 +7,11 @@ import { supabase } from "@/lib/supabase";
 import { generateLocalEstimate } from "@/lib/localEstimator";
 import { applyPriceBookRates } from "@/lib/priceBookPricing.mjs";
 import { clearOfflineEstimateDraft, loadOfflineEstimateDraft, saveOfflineEstimateDraft } from "@/lib/offlineEstimateDraft";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 interface LineItemInput {
   description: string;
+  description_es?: string;
   quantity: number;
   unit_price: number;
 }
@@ -26,6 +28,7 @@ interface PriceBookItem {
 interface EstimatePackage {
   name: "Good" | "Better" | "Best";
   description: string;
+  description_es?: string;
   total: number;
 }
 
@@ -43,6 +46,7 @@ interface LocalEstimateDraft {
   savedAt: string;
   taxRate: number;
   markupPercentage: number;
+  proposalLanguage: "en" | "es";
 }
 
 interface EstimateAttachment { file: File; mediaType: "photo" | "voice"; }
@@ -63,6 +67,7 @@ export default function CreateEstimatePage() {
   const [depositPercentage, setDepositPercentage] = useState(20);
   const [taxRate, setTaxRate] = useState(0);
   const [markupPercentage, setMarkupPercentage] = useState(0);
+  const [proposalLanguage, setProposalLanguage] = useState<"en" | "es">("en");
   const [attachments, setAttachments] = useState<EstimateAttachment[]>([]);
   const [connectionOnline, setConnectionOnline] = useState(true);
   const [recording, setRecording] = useState(false);
@@ -77,7 +82,7 @@ export default function CreateEstimatePage() {
 
   // Line Items
   const [lineItems, setLineItems] = useState<LineItemInput[]>([
-    { description: "Standard Labor / Initial Assessment", quantity: 1, unit_price: 150 },
+    { description: "Standard Labor / Initial Assessment", description_es: "Mano de obra estándar / evaluación inicial", quantity: 1, unit_price: 150 },
   ]);
   const [priceBookItems, setPriceBookItems] = useState<PriceBookItem[]>([]);
   const [showPriceBook, setShowPriceBook] = useState(false);
@@ -90,7 +95,7 @@ export default function CreateEstimatePage() {
   const saveDraftOnDevice = () => {
     const draft: LocalEstimateDraft = {
       clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit,
-      depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, savedAt: new Date().toISOString(),
+      depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage, savedAt: new Date().toISOString(),
     };
     void saveOfflineEstimateDraft(draft, attachments.map(({ file, mediaType }) => ({ name: file.name, type: file.type, mediaType, blob: file })))
       .then(() => setDraftStorageMessage("Draft and attachments saved privately in this browser on this device. It includes customer contact details."))
@@ -134,6 +139,7 @@ export default function CreateEstimatePage() {
     if (Array.isArray(draft.lineItems)) setLineItems(draft.lineItems);
     setPackageOptions(isProSubscriber && Array.isArray(draft.packageOptions) ? draft.packageOptions : []);
     setTaxRate(Number(draft.taxRate) || 0); setMarkupPercentage(Number(draft.markupPercentage) || 0);
+    setProposalLanguage(draft.proposalLanguage === "es" ? "es" : "en");
   };
 
   const deleteDraftFromDevice = () => {
@@ -322,6 +328,7 @@ export default function CreateEstimatePage() {
               package_options: packageOptions,
               tax_rate: taxRate,
               markup_percentage: markupPercentage,
+              proposal_language: proposalLanguage,
               user_id: user.id,
             require_deposit: requireDeposit,
             deposit_percentage: depositPercentage,
@@ -338,6 +345,7 @@ export default function CreateEstimatePage() {
       const formattedItems = lineItems.map((item) => ({
         estimate_id: est.id,
         description: item.description,
+        description_es: item.description_es?.trim() || null,
         quantity: item.quantity,
         unit_price: item.unit_price,
       }));
@@ -368,6 +376,7 @@ export default function CreateEstimatePage() {
   };
 
   return (
+    <LocalizedTree>
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Subscription plan status */}
@@ -412,6 +421,7 @@ export default function CreateEstimatePage() {
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Client Information
             </h2>
+            <label className="block max-w-sm text-xs font-medium text-slate-700">Customer proposal language<select value={proposalLanguage} onChange={(event) => setProposalLanguage(event.target.value === "es" ? "es" : "en")} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm"><option value="en">English proposal</option><option value="es">Spanish proposal</option></select></label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Trade</label>
@@ -564,7 +574,8 @@ export default function CreateEstimatePage() {
 
             <div className="space-y-3">
               {lineItems.map((item, index) => (
-                <div key={index} className="flex gap-2 items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
+                <div key={index} className="space-y-2 rounded-lg border border-slate-200/80 bg-slate-50 p-2.5">
+                <div className="flex items-center gap-2">
                   <input
                     type="text"
                     placeholder="Item or service description"
@@ -601,6 +612,8 @@ export default function CreateEstimatePage() {
                       ✕
                     </button>
                   )}
+                </div>
+                <input type="text" value={item.description_es ?? ""} onChange={(event) => handleItemChange(index, "description_es", event.target.value)} placeholder="Spanish description (optional)" aria-label={`Spanish description for ${item.description || `line item ${index + 1}`}`} className="w-full rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500" />
                 </div>
               ))}
             </div>
@@ -661,10 +674,10 @@ export default function CreateEstimatePage() {
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><h2 className="text-sm font-semibold text-slate-900">Good / Better / Best options</h2><p className="mt-1 text-xs text-slate-500">Offer customers a choice of service levels on the proposal.</p></div>
-              {isProSubscriber ? <button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add three options"}</button> : <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Pro</span>}
+              {isProSubscriber ? <button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", description_es: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add three options"}</button> : <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Pro</span>}
             </div>
             {!isProSubscriber && <p className="mt-3 text-xs text-slate-500">Upgrade to Pro to add customer-selectable package options.</p>}
-            {packageOptions.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-700">{option.name}</p><input aria-label={`${option.name} option description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="Describe what's included" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><label className="block text-[11px] font-medium text-slate-600">Package total<input aria-label={`${option.name} total`} type="number" min="0" step="0.01" value={option.total} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total: Number(event.target.value) || 0 } : item))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold" /></label></div>)}</div>}
+            {packageOptions.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-700">{option.name}</p><input aria-label={`${option.name} option description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="Describe what's included" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><input aria-label={`${option.name} Spanish description`} value={option.description_es ?? ""} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description_es: event.target.value } : item))} placeholder="Spanish description (optional)" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><label className="block text-[11px] font-medium text-slate-600">Package total<input aria-label={`${option.name} total`} type="number" min="0" step="0.01" value={option.total} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total: Number(event.target.value) || 0 } : item))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold" /></label></div>)}</div>}
           </section>
 
           {/* Submit Button */}
@@ -678,5 +691,6 @@ export default function CreateEstimatePage() {
         </form>
       </div>
     </div>
+    </LocalizedTree>
   );
 }

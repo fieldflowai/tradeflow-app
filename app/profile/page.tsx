@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
@@ -101,6 +102,7 @@ export default function ProfilePage() {
   }
 
   return (
+    <LocalizedTree>
     <div className="max-w-2xl mx-auto p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Profile & Preferences</h1>
@@ -219,5 +221,6 @@ export default function ProfilePage() {
         </div>
       </form>
     </div>
+    </LocalizedTree>
   );
 }

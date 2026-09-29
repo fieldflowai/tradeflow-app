@@ -15,7 +15,7 @@ export async function GET(
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { data: estimate, error } = await admin
     .from("estimates")
-    .select("id, user_id, client_name, client_email, client_phone, job_address, status, require_deposit, deposit_percentage, tax_rate, markup_percentage, created_at, package_options, signature_name, selected_package, accepted_at")
+    .select("id, user_id, client_name, client_email, client_phone, job_address, status, require_deposit, deposit_percentage, tax_rate, markup_percentage, proposal_language, converted_job_id, created_at, package_options, signature_name, selected_package, accepted_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -39,7 +39,7 @@ export async function GET(
 
   const { data: lineItems, error: itemError } = await admin
     .from("line_items")
-    .select("id, description, quantity, unit_price")
+    .select("id, description, description_es, quantity, unit_price")
     .eq("estimate_id", id);
   if (itemError) {
     console.error("Proposal line item lookup failed:", itemError.message);
@@ -53,8 +53,8 @@ export async function GET(
     return data?.signedUrl ? { id: attachment.id, url: data.signedUrl } : null;
   }));
 
-  const { user_id: _privateOwnerId, ...publicEstimate } = estimate;
-  return NextResponse.json({ estimate: publicEstimate, lineItems: lineItems ?? [], contractor, photos: photos.filter(Boolean) }, {
+  const { user_id: _privateOwnerId, converted_job_id: _privateJobId, ...publicEstimate } = estimate;
+  return NextResponse.json({ estimate: publicEstimate, converted: Boolean(_privateJobId), lineItems: lineItems ?? [], contractor, photos: photos.filter(Boolean) }, {
     headers: {
       "Cache-Control": "private, no-store",
       "X-Robots-Tag": "noindex, nofollow",

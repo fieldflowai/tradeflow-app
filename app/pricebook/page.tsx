@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 import { parsePriceBookCsv } from "@/lib/priceBookCsv.mjs";
 import type { ImportedPriceBookItem } from "@/lib/priceBookCsv.mjs";
 
@@ -119,6 +120,7 @@ export default function PriceBookPage() {
   };
 
   return (
+    <LocalizedTree>
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 md:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -177,6 +179,7 @@ export default function PriceBookPage() {
         )}
       </div>
     </main>
+    </LocalizedTree>
   );
 }
 

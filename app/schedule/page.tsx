@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 type JobStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
 interface Job {
@@ -24,6 +25,8 @@ interface Estimate {
   client_name: string;
   client_email: string;
   job_address: string;
+  trade: string;
+  converted_job_id: string | null;
 }
 
 const statusLabels: Record<JobStatus, string> = {
@@ -53,7 +56,7 @@ export default function SchedulePage() {
     setError("");
     const [jobsResult, estimatesResult] = await Promise.all([
       supabase.from("jobs").select("*").order("scheduled_at", { ascending: true, nullsFirst: false }),
-      supabase.from("estimates").select("id, client_name, client_email, job_address").order("created_at", { ascending: false }),
+      supabase.from("estimates").select("id, client_name, client_email, job_address, trade, converted_job_id").eq("status", "accepted").is("converted_job_id", null).order("created_at", { ascending: false }),
     ]);
     if (jobsResult.error) setError(`${jobsResult.error.message}. Apply the TradeFlow operations migration if the jobs table is missing.`);
     else setJobs((jobsResult.data ?? []) as Job[]);
@@ -62,6 +65,21 @@ export default function SchedulePage() {
   }, []);
 
   useEffect(() => { void loadData(); }, [loadData]);
+
+  useEffect(() => {
+    const targetEstimate = new URLSearchParams(window.location.search).get("estimate");
+    if (!targetEstimate || !estimates.length) return;
+    const acceptedEstimate = estimates.find((estimate) => estimate.id === targetEstimate);
+    if (acceptedEstimate) {
+      setEstimateId(acceptedEstimate.id);
+      setClientName(acceptedEstimate.client_name ?? "");
+      setClientEmail(acceptedEstimate.client_email ?? "");
+      setJobAddress(acceptedEstimate.job_address ?? "");
+      setTitle(`${acceptedEstimate.client_name || "Customer"} ${acceptedEstimate.trade || "service"} job`);
+      setShowForm(true);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [estimates]);
 
   const chooseEstimate = (id: string) => {
     setEstimateId(id);
@@ -80,23 +98,32 @@ export default function SchedulePage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setError("Sign in to schedule jobs."); setSaving(false); return; }
 
-    let quotedTotal = 0;
     if (estimateId) {
-      const { data: linkedEstimate } = await supabase.from("estimates").select("package_options, selected_package").eq("id", estimateId).maybeSingle();
-      const { data: lines } = await supabase.from("line_items").select("quantity, unit_price").eq("estimate_id", estimateId);
-      const selectedOption = Array.isArray(linkedEstimate?.package_options) ? linkedEstimate.package_options.find((option: { name: string }) => option.name === linkedEstimate.selected_package) : null;
-      quotedTotal = selectedOption ? Number(selectedOption.total) : (lines ?? []).reduce((sum, row) => sum + Number(row.quantity || 0) * Number(row.unit_price || 0), 0);
+      const { error: convertError } = await supabase.rpc("convert_accepted_estimate_to_job", {
+        p_estimate_id: estimateId,
+        p_scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+        p_title: title,
+        p_notes: notes,
+      });
+      if (convertError) setError(convertError.message);
+      else {
+        setShowForm(false);
+        setEstimateId(""); setTitle(""); setClientName(""); setClientEmail(""); setJobAddress(""); setScheduledAt(""); setNotes("");
+        await loadData();
+      }
+      setSaving(false);
+      return;
     }
     const { error: insertError } = await supabase.from("jobs").insert({
       user_id: user.id,
-      estimate_id: estimateId || null,
+      estimate_id: null,
       title,
       client_name: clientName,
       client_email: clientEmail,
       job_address: jobAddress,
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
       notes,
-      quoted_total: quotedTotal,
+      quoted_total: 0,
       status: "scheduled",
     });
     if (insertError) setError(insertError.message);
@@ -139,6 +166,7 @@ export default function SchedulePage() {
   const todayCount = jobs.filter((job) => job.scheduled_at && new Date(job.scheduled_at).toDateString() === today && job.status !== "cancelled").length;
 
   return (
+    <LocalizedTree>
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 md:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -206,6 +234,7 @@ export default function SchedulePage() {
         </section>
       </div>
     </main>
+    </LocalizedTree>
   );
 }
 

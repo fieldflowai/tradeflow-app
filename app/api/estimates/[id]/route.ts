@@ -3,6 +3,7 @@ import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 
 type LineItemInput = {
   description: string;
+  description_es?: string | null;
   quantity: number;
   unit_price: number;
 };
@@ -25,7 +26,8 @@ function validLineItems(value: unknown): value is LineItemInput[] {
       typeof candidate.unit_price === "number" &&
       Number.isFinite(candidate.unit_price) &&
       candidate.unit_price >= 0 &&
-      candidate.unit_price <= 100000000;
+      candidate.unit_price <= 100000000 &&
+      (candidate.description_es === undefined || candidate.description_es === null || (typeof candidate.description_es === "string" && candidate.description_es.length <= 240));
   });
 }
 
@@ -53,7 +55,7 @@ export async function GET(
 
   const { data: lineItems, error: itemError } = await supabase
     .from("line_items")
-    .select("id, description, quantity, unit_price")
+    .select("id, description, description_es, quantity, unit_price")
     .eq("estimate_id", id);
 
   if (itemError) {
@@ -97,6 +99,7 @@ export async function PUT(
   const clientEmail = typeof body.client_email === "string" ? body.client_email.trim() : "";
   const clientPhone = typeof body.client_phone === "string" ? body.client_phone.trim() : "";
   const jobAddress = typeof body.job_address === "string" ? body.job_address.trim() : "";
+  const proposalLanguage = body.proposal_language === "es" ? "es" : "en";
   const depositPercentage = Number(body.deposit_percentage);
   const taxRate = Number(body.tax_rate);
   const markupPercentage = Number(body.markup_percentage);
@@ -131,6 +134,7 @@ export async function PUT(
     require_deposit: body.require_deposit === true,
     deposit_percentage: depositPercentage,
     package_options: Array.isArray(body.package_options) ? body.package_options : [],
+    proposal_language: proposalLanguage,
     status: "pending",
     updated_at: new Date().toISOString(),
   };
@@ -161,6 +165,7 @@ export async function PUT(
     body.lineItems.map((item) => ({
       estimate_id: id,
       description: item.description.trim(),
+      description_es: item.description_es?.trim() || null,
       quantity: item.quantity,
       unit_price: item.unit_price,
     }))

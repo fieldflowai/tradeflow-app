@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
+import { translate, useLanguage } from "@/app/components/LanguageProvider";
 
 const appLinks = [
   { href: "/dashboard", label: "Estimates" },
@@ -14,6 +15,7 @@ const appLinks = [
 ];
 
 export default function HeaderNav() {
+  const { language, setLanguage } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -81,11 +83,14 @@ export default function HeaderNav() {
   if (!user) {
     return (
       <div className="flex items-center gap-2">
+        <button type="button" onClick={() => setLanguage(language === "en" ? "es" : "en")} className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-bold text-slate-100 transition hover:bg-slate-700" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"}>
+          {language === "en" ? "ES" : "EN"}
+        </button>
         <Link href="/login" className="rounded-lg px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 hover:text-white">
-          Sign in
+          {translate(language, "Sign in")}
         </Link>
         <Link href="/signup" className="rounded-lg bg-orange-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-orange-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400">
-          Create account
+          {translate(language, "Create account")}
         </Link>
       </div>
     );
@@ -111,7 +116,7 @@ export default function HeaderNav() {
               : "text-slate-300 hover:bg-slate-800 hover:text-white"
           } ${mobile ? "block w-full" : "whitespace-nowrap"}`}
         >
-          {label}
+          {translate(language, label)}
         </Link>
       ))}
       <Link
@@ -119,13 +124,16 @@ export default function HeaderNav() {
         onClick={() => setMobileMenuOpen(false)}
         className={`rounded-lg bg-orange-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-orange-500 ${mobile ? "mt-2 block text-center" : "whitespace-nowrap"}`}
       >
-        + New estimate
+        {translate(language, "+ New estimate")}
       </Link>
     </>
   );
 
   return (
     <div className="relative flex items-center gap-2 sm:gap-3">
+      <button type="button" onClick={() => setLanguage(language === "en" ? "es" : "en")} className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-bold text-slate-100 transition hover:bg-slate-700" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"} title={language === "en" ? "Cambiar a español" : "Switch to English"}>
+        {language === "en" ? "ES" : "EN"}
+      </button>
       <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
         {renderLinks()}
       </nav>
@@ -153,10 +161,10 @@ export default function HeaderNav() {
               <p className="mt-1 truncate text-sm font-medium text-slate-900">{user.email}</p>
             </div>
             <Link role="menuitem" href="/profile" onClick={() => setDropdownOpen(false)} className="block px-4 py-3 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-950">
-              Profile & preferences
+              {translate(language, "Profile & preferences")}
             </Link>
             <button role="menuitem" type="button" onClick={handleSignOut} className="w-full border-t border-slate-100 px-4 py-3 text-left text-sm font-medium text-red-700 transition hover:bg-red-50">
-              Sign out
+              {translate(language, "Sign out")}
             </button>
           </div>
         )}

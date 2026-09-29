@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import Logo from "@/app/components/Logo";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -38,6 +39,7 @@ export default function LoginForm() {
   };
 
   return (
+    <LocalizedTree>
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-slate-100">
       <div className="sm:mx-auto sm:w-full sm:max-w-md flex flex-col items-center">
         <Logo className="h-10 w-10" />
@@ -134,5 +136,6 @@ export default function LoginForm() {
         </div>
       </div>
     </div>
+    </LocalizedTree>
   );
 }

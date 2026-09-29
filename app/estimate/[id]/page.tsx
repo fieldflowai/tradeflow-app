@@ -2,10 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { LocalizedTree, type Language } from "@/app/components/LanguageProvider";
 
 interface LineItem {
   id: string;
   description: string;
+  description_es?: string | null;
   quantity: number;
   unit_price: number;
 }
@@ -21,6 +23,7 @@ interface Estimate {
   deposit_percentage: number;
   tax_rate: number;
   markup_percentage: number;
+  proposal_language: Language;
   created_at: string;
   package_options?: EstimatePackage[];
   signature_name?: string | null;
@@ -35,6 +38,7 @@ interface OwnerAttachment { id: string; media_type: "photo" | "voice"; url: stri
 interface EstimatePackage {
   name: string;
   description: string;
+  description_es?: string;
   total: number;
 }
 
@@ -53,6 +57,8 @@ export default function ClientEstimatePage() {
   const [contractor, setContractor] = useState<ContractorBrand>({ businessName: "Your Contractor", phone: "", address: "", logoUrl: "", brandColor: "#c85b2d" });
   const [photos, setPhotos] = useState<ProposalPhoto[]>([]);
   const [ownerAttachments, setOwnerAttachments] = useState<OwnerAttachment[]>([]);
+  const [isOwner, setIsOwner] = useState(false);
+  const [wasConverted, setWasConverted] = useState(false);
   const [questionName, setQuestionName] = useState("");
   const [questionEmail, setQuestionEmail] = useState("");
   const [questionMessage, setQuestionMessage] = useState("");
@@ -71,11 +77,13 @@ export default function ClientEstimatePage() {
         const estData = result.estimate as Estimate;
 
         setEstimate(estData);
+        setWasConverted(result.converted === true);
         if (result.contractor) setContractor(result.contractor as ContractorBrand);
         if (Array.isArray(result.photos)) setPhotos(result.photos as ProposalPhoto[]);
         try {
           const ownerResponse = await fetch(`/api/estimates/${encodeURIComponent(id)}`, { cache: "no-store" });
           if (ownerResponse.ok) {
+            setIsOwner(true);
             const ownerData = await ownerResponse.json();
             if (Array.isArray(ownerData.attachments)) setOwnerAttachments(ownerData.attachments as OwnerAttachment[]);
           }
@@ -179,6 +187,7 @@ export default function ClientEstimatePage() {
   }
 
   return (
+    <LocalizedTree languageOverride={estimate.proposal_language}>
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-3xl mx-auto space-y-4">
         {/* Contractor Admin Bar (Edit & Navigation Controls) */}
@@ -253,7 +262,7 @@ export default function ClientEstimatePage() {
                   <button key={`${option.name}-${index}`} type="button" onClick={() => setSelectedPackage(index)} className={`rounded-xl border p-4 text-left transition ${selectedPackage === index ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200 bg-white hover:border-slate-400"}`}>
                     <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{option.name}</span>
                     <span className="mt-2 block text-xl font-bold text-slate-900">${Number(option.total).toFixed(2)}</span>
-                    {option.description && <span className="mt-2 block text-xs leading-5 text-slate-600">{option.description}</span>}
+                    {(estimate.proposal_language === "es" ? option.description_es || option.description : option.description) && <span className="mt-2 block text-xs leading-5 text-slate-600">{estimate.proposal_language === "es" ? option.description_es || option.description : option.description}</span>}
                   </button>
                 ))}
               </div>
@@ -302,7 +311,7 @@ export default function ClientEstimatePage() {
                   {lineItems.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/50">
                       <td className="p-3 font-medium text-slate-800">
-                        {item.description}
+                        {estimate.proposal_language === "es" ? item.description_es || item.description : item.description}
                       </td>
                       <td className="p-3 text-center text-slate-600">
                         {item.quantity}
@@ -318,6 +327,7 @@ export default function ClientEstimatePage() {
                 </tbody>
               </table>
             </div>
+            {estimate.proposal_language === "es" && (lineItems.some((item) => !item.description_es) || estimate.package_options?.some((option) => !option.description_es)) && <p className="text-xs text-slate-500">Some work descriptions remain in the contractor’s original language because Spanish wording was not provided.</p>}
           </div>
 
           {/* Deposit & Summary Box */}
@@ -358,6 +368,7 @@ export default function ClientEstimatePage() {
           ) : estimate.status === "accepted" ? (
             <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl text-center font-semibold text-sm">
               ✓ Your approval has been recorded. The contractor will contact you about payment and next steps.
+              {isOwner && (wasConverted ? <p className="mt-2 text-xs font-medium">This estimate has already been added to your job schedule.</p> : <button type="button" onClick={() => router.push(`/schedule?estimate=${encodeURIComponent(id)}`)} className="mt-3 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white">Schedule this approved job</button>)}
             </div>
           ) : (
             <>
@@ -385,5 +396,6 @@ export default function ClientEstimatePage() {
         </div>
       </div>
     </div>
+    </LocalizedTree>
   );
 }

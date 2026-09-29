@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 interface Estimate {
   id: string;
@@ -134,6 +135,7 @@ export default function DashboardPage() {
   );
 
   return (
+    <LocalizedTree>
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
@@ -285,6 +287,7 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </LocalizedTree>
   );
 }
 

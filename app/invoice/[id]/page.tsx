@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 interface JobInvoice {
   id: string;
@@ -56,6 +57,7 @@ export default function InvoicePage() {
   if (!job) return <main className="mx-auto max-w-xl p-8"><div className="rounded-xl border border-red-200 bg-white p-6 text-sm text-red-800">{error}</div></main>;
 
   return (
+    <LocalizedTree>
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 md:px-8">
       <div className="mx-auto max-w-3xl space-y-5">
         {error && <p role="alert" className="print:hidden rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
@@ -69,5 +71,6 @@ export default function InvoicePage() {
         </article>
       </div>
     </main>
+    </LocalizedTree>
   );
 }

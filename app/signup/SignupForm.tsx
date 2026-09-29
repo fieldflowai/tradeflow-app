@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 export default function SignupForm() {
   const [email, setEmail] = useState("");
@@ -56,6 +57,7 @@ export default function SignupForm() {
   };
 
   return (
+    <LocalizedTree>
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <h2 className="text-3xl font-extrabold text-white">
@@ -178,5 +180,6 @@ export default function SignupForm() {
         </div>
       </div>
     </div>
+    </LocalizedTree>
   );
 }

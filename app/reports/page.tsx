@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 type Estimate = { id: string; status: string; created_at: string };
 type LineItem = { estimate_id: string; quantity: number; unit_price: number };
@@ -58,6 +59,7 @@ export default function ReportsPage() {
   const maxMonth = Math.max(1, ...monthBuckets.map((month) => month.amount));
 
   return (
+    <LocalizedTree>
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 md:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -96,6 +98,7 @@ export default function ReportsPage() {
         </>}
       </div>
     </main>
+    </LocalizedTree>
   );
 }
 
