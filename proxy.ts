@@ -1,5 +1,5 @@
 // proxy.ts (located in tradesman-app/proxy.ts)
-import { type NextRequest } from "next";
+import { type NextRequest } from "next/server";
 import { updateSession } from "@/app/utils/supabase/middleware";
 
 export async function proxy(request: NextRequest) {

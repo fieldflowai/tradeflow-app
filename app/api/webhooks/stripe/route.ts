@@ -2,6 +2,12 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+function getPeriodEnd(subscription: Stripe.Subscription) {
+  const periodEnds = subscription.items.data.map((item) => item.current_period_end);
+  const latestPeriodEnd = Math.max(0, ...periodEnds);
+  return latestPeriodEnd ? new Date(latestPeriodEnd * 1000).toISOString() : null;
+}
+
 export async function POST(request: Request) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -38,7 +44,7 @@ export async function POST(request: Request) {
         stripe_customer_id: String(session.customer),
         stripe_subscription_id: subscription.id,
         status: subscription.status,
-        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        current_period_end: getPeriodEnd(subscription),
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -55,7 +61,7 @@ export async function POST(request: Request) {
       stripe_customer_id: customerId,
       stripe_subscription_id: subscription.id,
       status: subscription.status,
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      current_period_end: getPeriodEnd(subscription),
       updated_at: new Date().toISOString(),
     }, { onConflict: "user_id" });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

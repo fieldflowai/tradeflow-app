@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
 export default function HeaderNav() {
   const [user, setUser] = useState<User | null>(null);
@@ -17,15 +17,15 @@ export default function HeaderNav() {
     const supabase = createClient();
 
     // Fetch initial session
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
+    void supabase.auth.getUser().then((result) => {
+      setUser(result.data.user);
       setLoading(false);
     });
 
     // Listen for auth updates
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });

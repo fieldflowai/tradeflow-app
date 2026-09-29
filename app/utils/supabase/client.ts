@@ -1,8 +1,9 @@
 import { createBrowserClient } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-let client: ReturnType | undefined
+let client: SupabaseClient | undefined
 
-export function createClient() {
+export function createClient(): SupabaseClient {
   if (client) return client
 
   client = createBrowserClient(
