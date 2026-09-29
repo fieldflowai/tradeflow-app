@@ -76,7 +76,7 @@ export default function PriceBookPage() {
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-blue-700">Free tools</p><h1 className="mt-1 text-2xl font-bold">Price book & templates</h1><p className="mt-1 text-sm text-slate-600">Set your own rates and reuse the work you quote most.</p></div>
-          <Link href="/" className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Create estimate</Link>
+          <Link href="/estimate/new" className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Create estimate</Link>
         </header>
 
         {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
@@ -111,7 +111,7 @@ export default function PriceBookPage() {
             <section className="h-fit space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold">Build a reusable template</h2>
               <p className="text-sm text-slate-600">Set up the scope, quantities, and rates in the estimate builder, then save the complete estimate as a template.</p>
-              <Link href="/" className="inline-flex rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500">Open estimate builder</Link>
+              <Link href="/estimate/new" className="inline-flex rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500">Open estimate builder</Link>
             </section>
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 p-5"><h2 className="font-semibold">Reusable templates</h2></div>

@@ -9,7 +9,7 @@ interface LogoProps {
 export default function Logo({
   className = "h-10 w-10",
   showText = true,
-  href = "/dashboard",
+  href = "/",
 }: LogoProps) {
   return (
     <Link href={href} aria-label="TradeFlow home" className="group inline-flex items-center gap-3">

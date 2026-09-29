@@ -134,7 +134,7 @@ export default function DashboardPage() {
             </p>
           </div>
           <Link
-            href="/"
+            href="/estimate/new"
             className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm"
           >
             + New Estimate
