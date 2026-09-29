@@ -22,6 +22,7 @@ Copy `.env.example` to `.env.local` and set the values for integrations you enab
 - In Vercel Production environment variables, set `NEXT_PUBLIC_APP_URL=https://tradeflow-app-ai.vercel.app` and set `NEXT_PUBLIC_SUPPORT_EMAIL` to a real monitored support address. Do not set a public-prefixed variable to secret-only visibility.
 - For Supabase Auth email, configure a verified sender and custom SMTP in the Supabase dashboard. For Resend SMTP use host `smtp.resend.com`, port `587`, username `resend`, and the Resend API key as the password. Keep credentials in the Supabase dashboard, not Git.
 - In Supabase Auth URL Configuration, set Site URL to `https://tradeflow-app-ai.vercel.app` and allow the production confirmation redirect `https://tradeflow-app-ai.vercel.app/auth/confirm`.
+- To prevent email scanners from consuming reset links, update Supabase Auth → Email Templates → Reset Password. Set the link to `<a href="{{ .SiteURL }}/confirm-reset?token_hash={{ .TokenHash }}&amp;type=recovery">Continue password reset</a>`. The new `/confirm-reset` page verifies the one-time token only after the user clicks its button.
 
 The app reads subscription state from Stripe webhook updates. Pro tools stay locked until the webhook records an active or trialing subscription.
 

@@ -1,15 +1,22 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import Logo from "@/app/components/Logo";
 
 export default function ForgotPasswordPage() {
+  return <Suspense fallback={<main className="min-h-screen bg-slate-950" />}><ForgotPasswordForm /></Suspense>;
+}
+
+function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const expiredLink = searchParams.get("error") === "expired";
 
   const handleResetRequest = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -19,7 +26,7 @@ export default function ForgotPasswordPage() {
 
     const supabase = createClient();
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/confirm?next=/reset-password`,
+      redirectTo: `${window.location.origin}/auth/confirm?next=%2Freset-password`,
     });
 
     if (resetError) setError(resetError.message);
@@ -37,7 +44,7 @@ export default function ForgotPasswordPage() {
 
       <section className="mx-auto mt-8 w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 px-4 py-8 shadow sm:px-10">
         <form className="space-y-5" onSubmit={handleResetRequest}>
-          {error && <p role="alert" className="rounded-md border border-red-800 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>}
+          {(error || (expiredLink && !message)) && <p role="alert" className="rounded-md border border-red-800 bg-red-950/50 p-3 text-sm text-red-300">{error || "That password reset link has expired or was already used. Enter your email below to get a fresh link."}</p>}
           {message && <p role="status" className="rounded-md border border-emerald-800 bg-emerald-950/40 p-3 text-sm text-emerald-200">{message}</p>}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-slate-300">Email address</label>
