@@ -24,12 +24,12 @@ Billing support requires an active or trialing Stripe subscription and an existi
 
 ### Pro integrations
 
-Copy `.env.example` to `.env.local` and set the values for integrations you enable:
+Copy `.env.example` to `.env.local` and set the values for integrations you enable. Configure `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for new deployments; `NEXT_PUBLIC_SUPABASE_ANON_KEY` remains a temporary fallback during rollout:
 
 - Stripe: `STRIPE_SECRET_KEY`, `STRIPE_PRO_PRICE_ID`, and `STRIPE_WEBHOOK_SECRET`. Point the Stripe webhook at `/api/webhooks/stripe` and subscribe it to checkout completion and subscription update/deletion events.
 - Cloud estimate drafts: `GEMINI_API_KEY` (optionally set `GEMINI_MODEL`). The Gemini key stays server-side.
 - Branded email and follow-ups: `RESEND_API_KEY` and `RESEND_FROM_EMAIL`, using a sender domain verified with Resend.
-- Scheduled follow-ups: configure a scheduler to POST `/api/cron/followups` with `Authorization: Bearer <CRON_SECRET>`. The app schedules a follow-up seven days after sending an estimate email; the scheduler runs due messages.
+- Scheduled follow-ups: Vercel Cron calls `/api/cron/followups` daily at 09:00 UTC in production. Set `CRON_SECRET` as a private Vercel environment variable; the handler verifies the `Authorization: Bearer <CRON_SECRET>` header. The app schedules a follow-up seven days after sending an estimate email, and each run handles up to 100 due messages in small concurrent batches. Preview deployments do not run Vercel Cron jobs.
 - Set `SUPABASE_SERVICE_ROLE_KEY` for signed customer approvals, proposal view tracking, Stripe webhooks, and the follow-up worker. Keep this key private and server-side.
 - In Vercel Production environment variables, set `NEXT_PUBLIC_APP_URL=https://tradeflow-app-ai.vercel.app` and set `NEXT_PUBLIC_SUPPORT_EMAIL` to a real monitored support address. Do not set a public-prefixed variable to secret-only visibility.
 - For Supabase Auth email, configure a verified sender and custom SMTP in the Supabase dashboard. For Resend SMTP use host `smtp.resend.com`, port `587`, username `resend`, and the Resend API key as the password. Keep credentials in the Supabase dashboard, not Git.

@@ -2,6 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getTrustedAppOrigin } from "@/lib/security.mjs";
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -17,24 +19,30 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   let sent = 0;
-  for (const estimate of due ?? []) {
-    const link = `${appOrigin}/estimate/${encodeURIComponent(estimate.id)}`;
-    const result = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: sender,
-        to: [estimate.client_email],
-        subject: "Following up on your estimate",
-        text: `Hi ${estimate.client_name || "there"}, just checking whether you have any questions about your estimate. Review it here: ${link}`,
-        html: `<p>Hi ${String(estimate.client_name || "there").replace(/[&<>]/g, "")},</p><p>Just checking whether you have any questions about your estimate.</p><p><a href="${link}">Review your estimate</a></p>`,
-      }),
-    });
-    const responseData = await result.json();
-    if (!result.ok) continue;
-    await admin.from("estimates").update({ followup_sent_at: new Date().toISOString() }).eq("id", estimate.id);
-    await admin.from("estimate_email_events").insert({ user_id: estimate.user_id, estimate_id: estimate.id, recipient: estimate.client_email, provider_email_id: responseData.id, event: "follow_up_sent" });
-    sent++;
+  const batchSize = 10;
+  for (let offset = 0; offset < (due?.length ?? 0); offset += batchSize) {
+    const batch = due!.slice(offset, offset + batchSize);
+    const results = await Promise.all(batch.map(async (estimate) => {
+      const link = `${appOrigin}/estimate/${encodeURIComponent(estimate.id)}`;
+      const result = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: sender,
+          to: [estimate.client_email],
+          subject: "Following up on your estimate",
+          text: `Hi ${estimate.client_name || "there"}, just checking whether you have any questions about your estimate. Review it here: ${link}`,
+          html: `<p>Hi ${String(estimate.client_name || "there").replace(/[&<>]/g, "")},</p><p>Just checking whether you have any questions about your estimate.</p><p><a href="${link}">Review your estimate</a></p>`,
+        }),
+      });
+      const responseData = await result.json();
+      if (!result.ok) return false;
+      const { error: updateError } = await admin.from("estimates").update({ followup_sent_at: new Date().toISOString() }).eq("id", estimate.id);
+      if (updateError) return false;
+      const { error: eventError } = await admin.from("estimate_email_events").insert({ user_id: estimate.user_id, estimate_id: estimate.id, recipient: estimate.client_email, provider_email_id: responseData.id, event: "follow_up_sent" });
+      return !eventError;
+    }));
+    sent += results.filter(Boolean).length;
   }
   return NextResponse.json({ sent, checked: due?.length ?? 0 });
 }
