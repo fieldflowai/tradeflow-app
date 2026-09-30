@@ -16,6 +16,12 @@ Apply [`supabase/migrations/202609290002_language_and_estimate_handoff.sql`](sup
 
 Photos are shared on the customer proposal; voice recordings remain visible only to the signed-in contractor. Device drafts, including customer details and media, remain in that browser's IndexedDB and are not synced between devices. Clear them from the estimate form when no longer needed.
 
+### Internal admin support console
+
+Apply [`supabase/migrations/202609300001_admin_support_console.sql`](supabase/migrations/202609300001_admin_support_console.sql) to enable the private admin tables. Then in Supabase SQL Editor, replace the example email in the commented grant statement at the bottom of that migration with the exact email on your Supabase Auth account, uncomment it, and run it. Assign `support` to support staff who need account lookup, recovery emails, and notes; assign `billing` for coupon actions; reserve `super_admin` for the owner. The console is at `/admin` and requires `SUPABASE_SERVICE_ROLE_KEY` to be configured as a private server variable. Admin sessions must complete Supabase TOTP multi-factor authentication before accessing customer or billing data; the console provides an enrollment/verification screen. Enroll a second authenticator factor for recovery before relying on this for production support. Never add admin membership from the browser or expose the service-role key.
+
+Billing support requires an active or trialing Stripe subscription and an existing Stripe coupon that is 100% off, one-time or repeating for no more than 3 months. Create the coupon in Stripe first; the console applies it and records the reason. Supabase Auth sends password recovery using the existing Auth SMTP/template and `/auth/confirm?next=%2Freset-password` redirect. All support notes and administrative actions are private to server-side admin APIs and are recorded in the audit log. Admin access is tied to the account UUID, so changing an email address does not grant admin permissions.
+
 ### Pro integrations
 
 Copy `.env.example` to `.env.local` and set the values for integrations you enable:

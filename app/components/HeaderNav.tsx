@@ -17,6 +17,7 @@ const appLinks = [
 export default function HeaderNav() {
   const { language, setLanguage } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
+  const [adminRole, setAdminRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -26,9 +27,23 @@ export default function HeaderNav() {
 
   useEffect(() => {
     const supabase = createClient();
+    const loadAdminRole = async (signedIn: boolean) => {
+      if (!signedIn) {
+        setAdminRole(null);
+        return;
+      }
+      try {
+        const response = await fetch("/api/admin/me", { cache: "no-store" });
+        const result = response.ok ? await response.json() : null;
+        setAdminRole(typeof result?.role === "string" ? result.role : null);
+      } catch {
+        setAdminRole(null);
+      }
+    };
     void supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
       setLoading(false);
+      void loadAdminRole(Boolean(data.user));
     });
 
     const {
@@ -37,6 +52,7 @@ export default function HeaderNav() {
       (_event: AuthChangeEvent, session: Session | null) => {
         setUser(session?.user ?? null);
         setLoading(false);
+        void loadAdminRole(Boolean(session?.user));
       }
     );
 
@@ -102,9 +118,10 @@ export default function HeaderNav() {
       ? pathname === "/dashboard" || pathname.startsWith("/estimate/")
       : pathname === href || pathname.startsWith(`${href}/`);
 
+  const links = adminRole ? [...appLinks, { href: "/admin", label: "Admin support" }] : appLinks;
   const renderLinks = (mobile = false) => (
     <>
-      {appLinks.map(({ href, label }) => (
+      {links.map(({ href, label }) => (
         <Link
           key={href}
           href={href}

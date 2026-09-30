@@ -1,0 +1,240 @@
+"use client";
+
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { createClient } from "@/app/utils/supabase/client";
+
+type AdminRole = "support" | "billing" | "super_admin";
+type Account = {
+  id: string;
+  email: string;
+  business_name: string;
+  created_at: string;
+  last_sign_in_at: string | null;
+  email_confirmed_at: string | null;
+  plan_status: string;
+  current_period_end: string | null;
+  has_stripe_customer: boolean;
+  has_stripe_subscription: boolean;
+};
+type AccountDetail = {
+  account: { id: string; email: string; business_name: string; created_at: string; last_sign_in_at: string | null; email_confirmed_at: string | null; status: string; current_period_end: string | null; banned_until: string | null; has_stripe_subscription: boolean; subscription_updated_at: string | null };
+  notes: { id: string; note: string; category: string; created_at: string; actor_user_id: string | null; actor_email: string | null }[];
+  audit: { id: string; action: string; reason: string; outcome: string; details: Record<string, unknown>; created_at: string; actor_user_id: string | null; actor_email: string | null }[];
+  questions: { id: string; estimate_id: string; customer_name: string; customer_email: string; message: string; created_at: string; read_at: string | null }[];
+  email_events: { id: string; estimate_id: string; recipient: string; event: string; created_at: string }[];
+};
+
+function date(value: string | null) {
+  return value ? new Date(value).toLocaleString() : "Never";
+}
+
+async function requestJson(url: string, options?: RequestInit) {
+  const response = await fetch(url, { ...options, headers: { "Content-Type": "application/json", ...options?.headers }, cache: "no-store" });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "The request could not be completed.");
+  return result;
+}
+
+export default function AdminPage() {
+  const [role, setRole] = useState<AdminRole | null>(null);
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaVerifiedFactor, setMfaVerifiedFactor] = useState(false);
+  const [mfaFactorId, setMfaFactorId] = useState("");
+  const [mfaQrCode, setMfaQrCode] = useState("");
+  const [mfaSecret, setMfaSecret] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaBusy, setMfaBusy] = useState(false);
+  const [mfaError, setMfaError] = useState("");
+  const [accessState, setAccessState] = useState<"loading" | "ready" | "denied" | "error">("loading");
+  const [search, setSearch] = useState("");
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [detail, setDetail] = useState<AccountDetail | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [note, setNote] = useState("");
+  const [noteCategory, setNoteCategory] = useState("support");
+  const [noteReason, setNoteReason] = useState("");
+  const [recoveryReason, setRecoveryReason] = useState("");
+  const [couponId, setCouponId] = useState("");
+  const [billingReason, setBillingReason] = useState("");
+
+  const loadDetail = useCallback(async (id: string) => {
+    setSelectedId(id);
+    setDetail(null);
+    setError("");
+    try {
+      setDetail(await requestJson(`/api/admin/accounts/${encodeURIComponent(id)}`));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not load this account.");
+    }
+  }, []);
+
+  useEffect(() => {
+    void requestJson("/api/admin/me").then((result) => {
+      setRole(result.role);
+      setMfaRequired(Boolean(result.mfa_required));
+      if (result.mfa_required) {
+        void createClient().auth.mfa.listFactors().then(({ data }) => {
+          if (!data) return;
+          const verified = data.totp.find((factor) => factor.status === "verified");
+          if (verified) {
+            setMfaFactorId(verified.id);
+            setMfaVerifiedFactor(true);
+          }
+        });
+      }
+      setAccessState("ready");
+    }).catch((cause) => {
+      setAccessState(cause instanceof Error && cause.message.includes("not authorized") ? "denied" : "error");
+      setError(cause instanceof Error ? cause.message : "Admin access could not be checked.");
+    });
+  }, []);
+
+  const beginMfaSetup = async () => {
+    setMfaBusy(true);
+    setMfaError("");
+    try {
+      const { data, error: enrollError } = await createClient().auth.mfa.enroll({ factorType: "totp", friendlyName: "TradeFlow admin" });
+      if (enrollError || !data) throw enrollError || new Error("Could not start authenticator setup.");
+      setMfaFactorId(data.id);
+      setMfaQrCode(data.totp.qr_code);
+      setMfaSecret(data.totp.secret);
+      setMfaVerifiedFactor(false);
+    } catch (cause) {
+      setMfaError(cause instanceof Error ? cause.message : "Could not start MFA setup.");
+    } finally {
+      setMfaBusy(false);
+    }
+  };
+
+  const verifyMfa = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!mfaFactorId || !/^\d{6}$/.test(mfaCode)) return;
+    setMfaBusy(true);
+    setMfaError("");
+    try {
+      const supabase = createClient();
+      const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
+      if (challengeError) throw challengeError;
+      const { error: verifyError } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: challenge.id, code: mfaCode });
+      if (verifyError) throw verifyError;
+      const result = await requestJson("/api/admin/me");
+      setMfaRequired(Boolean(result.mfa_required));
+      setMfaVerifiedFactor(true);
+      setMfaQrCode("");
+      setMfaSecret("");
+      setMfaCode("");
+    } catch (cause) {
+      setMfaError(cause instanceof Error ? cause.message : "That authenticator code could not be verified.");
+    } finally {
+      setMfaBusy(false);
+    }
+  };
+
+  const searchAccounts = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    setSearching(true);
+    setAccounts([]);
+    setSelectedId("");
+    setDetail(null);
+    try {
+      const result = await requestJson(`/api/admin/accounts?q=${encodeURIComponent(search.trim())}`);
+      setAccounts(result.accounts);
+      if (!result.accounts.length) setNotice("No matching account was found.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Account search failed.");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const runAction = async (name: string, url: string, payload: Record<string, string>, successMessage: string): Promise<boolean> => {
+    if (!selectedId) return false;
+    setBusy(name);
+    setError("");
+    setNotice("");
+    try {
+      const result = await requestJson(url, { method: "POST", body: JSON.stringify(payload) });
+      setNotice(result.message || successMessage);
+      await loadDetail(selectedId);
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The action failed.");
+      return false;
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const saveNote = (event: FormEvent) => {
+    event.preventDefault();
+    if (!note.trim() || !noteReason.trim()) return;
+    void runAction("note", `/api/admin/accounts/${encodeURIComponent(selectedId)}/notes`, { note, category: noteCategory, reason: noteReason }, "Support note saved.").then((saved) => {
+      if (saved) { setNote(""); setNoteCategory("support"); setNoteReason(""); }
+    });
+  };
+
+  const sendRecovery = () => {
+    if (!selectedId || !recoveryReason.trim()) return;
+    if (!window.confirm(`Send a password recovery email to ${detail?.account.email}?`)) return;
+    void runAction("recovery", `/api/admin/accounts/${encodeURIComponent(selectedId)}/reset-password`, { reason: recoveryReason }, "Recovery email requested.").then((sent) => { if (sent) setRecoveryReason(""); });
+  };
+
+  const applyCoupon = (event: FormEvent) => {
+    event.preventDefault();
+    if (!selectedId || !couponId.trim() || !billingReason.trim()) return;
+    if (!window.confirm("Apply this existing 100% Stripe coupon to the customer’s subscription?")) return;
+    void runAction("billing", `/api/admin/accounts/${encodeURIComponent(selectedId)}/billing`, { coupon_id: couponId, reason: billingReason }, "Stripe discount applied.").then((applied) => {
+      if (applied) { setCouponId(""); setBillingReason(""); }
+    });
+  };
+
+  if (accessState === "loading") return <main className="mx-auto max-w-6xl px-4 py-14"><p className="text-slate-600">Checking administrator access…</p></main>;
+  if (accessState !== "ready") return <main className="mx-auto max-w-3xl px-4 py-14"><section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"><h1 className="text-2xl font-bold text-slate-900">Admin support</h1><p className="mt-3 text-slate-600">{accessState === "denied" ? "This account does not have support-console access." : error}</p></section></main>;
+
+  if (mfaRequired) return <main className="mx-auto max-w-2xl px-4 py-14"><section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"><p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-700">Protected admin access</p><h1 className="mt-2 text-2xl font-bold text-slate-950">Verify your identity</h1><p className="mt-2 text-sm leading-6 text-slate-600">TradeFlow requires an authenticator code before opening customer support or billing data.</p>{mfaError && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">{mfaError}</p>}{!mfaFactorId ? <button type="button" onClick={() => void beginMfaSetup()} disabled={mfaBusy} className="mt-5 rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{mfaBusy ? "Starting setup…" : "Set up authenticator app"}</button> : <><div className="mt-5 rounded-xl bg-slate-50 p-4">{mfaQrCode && <div className="flex flex-col items-center gap-3"><img src={mfaQrCode} alt="QR code for TradeFlow admin authenticator" className="h-48 w-48 rounded-lg bg-white p-2" /><p className="text-sm font-semibold text-slate-800">Scan this QR code with an authenticator app.</p>{mfaSecret && <p className="break-all text-xs text-slate-600">Manual setup key: <code>{mfaSecret}</code></p>}</div>}{mfaVerifiedFactor && <p className="text-sm text-slate-700">Enter the current code from your authenticator app.</p>}</div><form onSubmit={verifyMfa} className="mt-4"><label htmlFor="admin-mfa-code" className="block text-sm font-semibold text-slate-800">6-digit authenticator code</label><input id="admin-mfa-code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={mfaCode} onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, "").slice(0, 6))} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 text-lg tracking-[0.3em]" /><button disabled={mfaBusy || mfaCode.length !== 6} className="mt-4 rounded-lg bg-orange-700 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{mfaBusy ? "Verifying…" : "Verify and open admin support"}</button></form></>}</section></main>;
+
+  return (
+    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+        <div><p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-700">TradeFlow internal</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Admin support</h1><p className="mt-2 text-slate-600">Look up an account, send password recovery, record support context, and review subscription status.</p></div>
+        <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-slate-600">{role?.replace("_", " ")}</span>
+      </div>
+      {error && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
+      {notice && <div role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <h2 className="text-lg font-bold text-slate-900">Find a customer account</h2>
+        <form onSubmit={searchAccounts} className="mt-4 flex flex-col gap-3 sm:flex-row">
+          <label className="sr-only" htmlFor="account-search">Email or business name</label>
+          <input id="account-search" value={search} onChange={(event) => setSearch(event.target.value)} minLength={3} maxLength={120} placeholder="Search by email or business name" className="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none focus:border-orange-600 focus:ring-2 focus:ring-orange-100" />
+          <button disabled={searching || search.trim().length < 3} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{searching ? "Searching…" : "Search accounts"}</button>
+        </form>
+        {accounts.length > 0 && <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">{accounts.map((account) => <button key={account.id} type="button" onClick={() => void loadDetail(account.id)} className={`flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-orange-50 sm:flex-row sm:items-center sm:justify-between ${selectedId === account.id ? "bg-orange-50" : ""}`}><span><span className="block font-semibold text-slate-900">{account.email}</span><span className="text-xs text-slate-500">{account.business_name || "No business name"} · Joined {date(account.created_at)}</span></span><span className="text-xs font-bold uppercase text-slate-600">{account.plan_status}</span></button>)}</div>}
+      </section>
+
+      {detail && <div className="mt-6 grid items-start gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Account</p><h2 className="mt-1 break-all text-xl font-bold text-slate-950">{detail.account.email}</h2><p className="mt-1 text-sm text-slate-600">{detail.account.business_name || "No business name on file"}</p></div>
+          <dl className="grid grid-cols-2 gap-3 text-sm"><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Email confirmed</dt><dd className="mt-1 font-semibold text-slate-900">{detail.account.email_confirmed_at ? "Yes" : "No"}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Plan status</dt><dd className="mt-1 font-semibold capitalize text-slate-900">{detail.account.status}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Joined</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.created_at)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Last sign in</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.last_sign_in_at)}</dd></div><div className="col-span-2 rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Current billing period ends</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.current_period_end)}</dd></div></dl>
+
+          <div className="border-t border-slate-100 pt-4"><h3 className="font-bold text-slate-900">Password assistance</h3><p className="mt-1 text-xs leading-5 text-slate-600">Sends a Supabase recovery email. You cannot view or set the customer’s existing password.</p><label className="mt-3 block text-xs font-semibold text-slate-700">Reason for support action<input value={recoveryReason} onChange={(event) => setRecoveryReason(event.target.value)} maxLength={500} placeholder="For example: customer requested account access help" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><button type="button" onClick={sendRecovery} disabled={busy !== "" || recoveryReason.trim().length < 8} className="mt-3 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "recovery" ? "Sending…" : "Send password recovery email"}</button></div>
+
+          {role !== "support" && <form onSubmit={applyCoupon} className="border-t border-slate-100 pt-4"><h3 className="font-bold text-slate-900">Temporary subscription discount</h3><p className="mt-1 text-xs leading-5 text-slate-600">Apply an existing Stripe 100% off coupon lasting once or up to 3 months. Create the coupon in Stripe first.</p><label className="mt-3 block text-xs font-semibold text-slate-700">Stripe coupon ID<input value={couponId} onChange={(event) => setCouponId(event.target.value)} maxLength={120} placeholder="e.g. support_one_month" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><label className="mt-3 block text-xs font-semibold text-slate-700">Reason<input value={billingReason} onChange={(event) => setBillingReason(event.target.value)} maxLength={500} placeholder="Service issue and agreed credit" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><button type="submit" disabled={busy !== "" || couponId.trim().length < 3 || billingReason.trim().length < 8 || !detail.account.has_stripe_subscription || !["active", "trialing"].includes(detail.account.status)} className="mt-3 rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "billing" ? "Applying…" : "Apply Stripe coupon"}</button><p className="mt-2 text-xs text-slate-500">Billing action is recorded in the admin audit log.</p></form>}
+
+          <form onSubmit={saveNote} className="border-t border-slate-100 pt-4"><h3 className="font-bold text-slate-900">Internal support note</h3><label className="mt-3 block text-xs font-semibold text-slate-700">Issue type<select value={noteCategory} onChange={(event) => setNoteCategory(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal"><option value="support">General support</option><option value="bug_report">Bug report</option><option value="billing">Billing issue</option><option value="email_delivery">Email delivery issue</option></select></label><label className="mt-3 block text-xs font-semibold text-slate-700">Note<textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} maxLength={5000} placeholder="Record relevant support context. Avoid passwords or payment-card data." className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><label className="mt-3 block text-xs font-semibold text-slate-700">Reason for adding note<input value={noteReason} onChange={(event) => setNoteReason(event.target.value)} maxLength={500} placeholder="Why this note is needed" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><button disabled={busy !== "" || !note.trim() || noteReason.trim().length < 8} className="mt-3 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 disabled:opacity-50">{busy === "note" ? "Saving…" : "Save support note"}</button></form>
+        </section>
+
+        <section className="space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-lg font-bold text-slate-900">Support history</h2><h3 className="mt-4 text-sm font-bold text-slate-700">Customer proposal questions</h3>{detail.questions.length ? <ol className="mt-2 space-y-2">{detail.questions.map((question) => <li key={question.id} className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-500">{question.customer_name} · {question.customer_email} · {date(question.created_at)}</p><p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">{question.message}</p></li>)}</ol> : <p className="mt-2 text-sm text-slate-500">No customer questions on record.</p>}<h3 className="mt-5 text-sm font-bold text-slate-700">Estimate email activity</h3>{detail.email_events.length ? <ol className="mt-2 space-y-2">{detail.email_events.map((item) => <li key={item.id} className="flex flex-wrap justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="font-semibold text-slate-700">{item.event.replaceAll("_", " ")} · {item.recipient || "No recipient recorded"}</span><span className="text-slate-500">{date(item.created_at)}</span></li>)}</ol> : <p className="mt-2 text-sm text-slate-500">No estimate email events on record.</p>}<h3 className="mt-5 text-sm font-bold text-slate-700">Internal notes and issue reports</h3>{detail.notes.length ? <ol className="mt-2 space-y-3">{detail.notes.map((entry) => <li key={entry.id} className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-orange-800">{entry.category.replaceAll("_", " ")}</p><p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{entry.note}</p><p className="mt-2 text-xs text-slate-500">{date(entry.created_at)} · {entry.actor_email || "Admin"}</p></li>)}</ol> : <p className="mt-2 text-sm text-slate-500">No internal notes yet.</p>}</div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-lg font-bold text-slate-900">Admin audit log</h2>{detail.audit.length ? <ol className="mt-4 space-y-3">{detail.audit.map((entry) => <li key={entry.id} className="rounded-xl border border-slate-100 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-slate-900">{entry.action.replaceAll("_", " ")}</p><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold capitalize text-slate-700">{entry.outcome}</span></div><p className="mt-1 text-sm text-slate-600">{entry.reason}</p><p className="mt-2 text-xs text-slate-500">{date(entry.created_at)} · {entry.actor_email || "Admin"}</p></li>)}</ol> : <p className="mt-3 text-sm text-slate-500">No admin actions recorded.</p>}</div>
+        </section>
+      </div>}
+    </main>
+  );
+}
