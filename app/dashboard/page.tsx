@@ -32,10 +32,6 @@ export default function DashboardPage() {
   const [emailEvents, setEmailEvents] = useState<Record<string, string>>({});
   const [questions, setQuestions] = useState<ProposalQuestion[]>([]);
 
-  useEffect(() => {
-    fetchEstimates();
-  }, []);
-
   async function fetchEstimates() {
     setLoading(true);
     try {
@@ -57,12 +53,16 @@ export default function DashboardPage() {
       const latest: Record<string, string> = {};
       for (const event of events ?? []) if (!latest[event.estimate_id]) latest[event.estimate_id] = event.event;
       setEmailEvents(latest);
-    } catch (err: any) {
-      console.error("Error fetching dashboard estimates:", err.message);
+    } catch (err: unknown) {
+      console.error("Error fetching dashboard estimates:", err);
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    void fetchEstimates();
+  }, []);
 
   const markQuestionRead = async (question: ProposalQuestion) => {
     const readAt = new Date().toISOString();
@@ -97,8 +97,8 @@ export default function DashboardPage() {
           est.id === id ? { ...est, is_archived: shouldArchive } : est
         )
       );
-    } catch (err: any) {
-      alert("Error updating estimate: " + err.message);
+    } catch (err: unknown) {
+      alert("Error updating estimate: " + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -125,8 +125,8 @@ export default function DashboardPage() {
       if (estError) throw estError;
 
       setEstimates((prev) => prev.filter((est) => est.id !== id));
-    } catch (err: any) {
-      alert("Error deleting estimate: " + err.message);
+    } catch (err: unknown) {
+      alert("Error deleting estimate: " + (err instanceof Error ? err.message : String(err)));
     }
   };
 

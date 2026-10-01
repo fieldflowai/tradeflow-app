@@ -74,14 +74,14 @@ export default function EditEstimatePage() {
         setPackageOptions(activePro && Array.isArray(estimate.package_options) ? estimate.package_options : []);
 
         setLineItems(
-          items.map((i: any) => ({
+          items.map((i: { description: string; description_es?: string; quantity: number; unit_price: number }) => ({
             description: i.description,
             description_es: i.description_es || "",
             quantity: i.quantity,
             unit_price: i.unit_price,
           }))
         );
-      } catch (err: any) {
+      } catch {
         alert("Failed to fetch estimate data");
       } finally {
         setLoading(false);
@@ -148,8 +148,8 @@ export default function EditEstimatePage() {
 
       // Redirect back to the updated client-facing proposal view
       router.push(`/estimate/${id}`);
-    } catch (err: any) {
-      alert("Error updating estimate: " + err.message);
+    } catch (err: unknown) {
+      alert("Error updating estimate: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setSaving(false);
     }
