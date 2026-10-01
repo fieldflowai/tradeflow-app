@@ -217,8 +217,8 @@ export default function CreateEstimatePage() {
         ? `${priced.matchedCount} line(s) matched your Price Book. Unmatched lines are $0 until you set your own rate.`
         : `${priced.matchedCount} line(s) matched your Price Book. Other local prices are starter references; review them before sending.`);
       setPromptText("");
-    } catch (err: any) {
-      alert("Error generating estimate: " + err.message);
+    } catch (err: unknown) {
+      alert("Error generating estimate: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsGenerating(false);
     }
@@ -368,8 +368,8 @@ export default function CreateEstimatePage() {
       await clearOfflineEstimateDraft().catch(() => undefined);
       localStorage.removeItem("tradeflow-unsent-estimate-v1");
       router.push(`/estimate/${est.id}`);
-    } catch (err: any) {
-      alert(createdEstimateId ? `Estimate ${createdEstimateId} was created, but a later save step failed. Open it from your dashboard; do not create it again. Details: ${err.message}` : "Error creating estimate: " + err.message);
+    } catch (err: unknown) {
+      alert(createdEstimateId ? `Estimate ${createdEstimateId} was created, but a later save step failed. Open it from your dashboard; do not create it again. Details: ${(err instanceof Error ? err.message : String(err))}` : "Error creating estimate: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setSaving(false);
     }

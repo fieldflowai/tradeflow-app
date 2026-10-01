@@ -1,4 +1,5 @@
 import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 
@@ -46,7 +47,7 @@ export function validReason(value: unknown): value is string {
   return typeof value === "string" && value.trim().length >= 8 && value.trim().length <= 500;
 }
 
-type AdminDatabase = { from: (table: string) => any };
+type AdminDatabase = SupabaseClient;
 
 export async function startAudit(admin: AdminDatabase, actorId: string, targetId: string, action: string, reason: string, details: Record<string, unknown> = {}, actorEmail?: string) {
   const { data, error } = await admin.from("tradeflow_admin_audit_log").insert({
