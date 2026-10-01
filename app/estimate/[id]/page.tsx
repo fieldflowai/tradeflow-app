@@ -94,8 +94,8 @@ export default function ClientEstimatePage() {
         void fetch(`/api/estimates/${id}/view`, { method: "POST" });
 
         setLineItems(result.lineItems || []);
-      } catch (err: any) {
-        console.error("Error loading proposal:", err.message);
+      } catch (err: unknown) {
+        console.error("Error loading proposal:", (err instanceof Error ? err.message : String(err)));
         setErrorMsg("Failed to load estimate details.");
       } finally {
         setLoading(false);
@@ -149,8 +149,8 @@ export default function ClientEstimatePage() {
       setEstimate((current) => current ? { ...current, signature_name: signatureName.trim(), selected_package: selectedPackage === null ? null : estimate?.package_options?.[selectedPackage]?.name, accepted_at: new Date().toISOString(), status: "accepted" } : current);
 
       setPaying(false);
-    } catch (err: any) {
-      alert("Error processing approval: " + err.message);
+    } catch (err: unknown) {
+      alert("Error processing approval: " + (err instanceof Error ? err.message : String(err)));
       setPaying(false);
     }
   };

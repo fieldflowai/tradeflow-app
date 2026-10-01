@@ -114,7 +114,7 @@ export default function PriceBookPage() {
     await loadData();
   };
 
-  const useTemplate = (template: EstimateTemplate) => {
+  const applyTemplate = (template: EstimateTemplate) => {
     sessionStorage.setItem("tradeflow-estimate-template", JSON.stringify(template));
     window.location.assign("/");
   };
@@ -173,7 +173,7 @@ export default function PriceBookPage() {
             </section>
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 p-5"><h2 className="font-semibold">Reusable templates</h2></div>
-              {loading ? <p className="p-8 text-center text-sm text-slate-500">Loading templates…</p> : templates.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No templates yet.</p> : <div className="divide-y divide-slate-100">{templates.map((template) => <div key={template.id} className="flex items-center justify-between gap-3 p-4"><div><p className="font-semibold">{template.name}</p><p className="text-xs text-slate-500">{template.trade} · {template.line_items?.length ?? 0} starter line items</p></div><div className="flex gap-3"><button onClick={() => useTemplate(template)} className="text-xs font-semibold text-blue-700 underline">Use template</button><button onClick={async () => { const { error: deleteError } = await supabase.from("estimate_templates").delete().eq("id", template.id); if (deleteError) setError(deleteError.message); else setTemplates((current) => current.filter((item) => item.id !== template.id)); }} className="text-xs font-semibold text-red-700 underline">Delete</button></div></div>)}</div>}
+              {loading ? <p className="p-8 text-center text-sm text-slate-500">Loading templates…</p> : templates.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No templates yet.</p> : <div className="divide-y divide-slate-100">{templates.map((template) => <div key={template.id} className="flex items-center justify-between gap-3 p-4"><div><p className="font-semibold">{template.name}</p><p className="text-xs text-slate-500">{template.trade} · {template.line_items?.length ?? 0} starter line items</p></div><div className="flex gap-3"><button onClick={() => applyTemplate(template)} className="text-xs font-semibold text-blue-700 underline">Use template</button><button onClick={async () => { const { error: deleteError } = await supabase.from("estimate_templates").delete().eq("id", template.id); if (deleteError) setError(deleteError.message); else setTemplates((current) => current.filter((item) => item.id !== template.id)); }} className="text-xs font-semibold text-red-700 underline">Delete</button></div></div>)}</div>}
             </section>
           </div>
         )}
