@@ -1,6 +1,8 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## TradeFlow business features
+## WorkCraft AI business features
+
+The marketing and social launch steps are in [`docs/WORKCRAFT-AI-MARKETING-GUIDE.md`](docs/WORKCRAFT-AI-MARKETING-GUIDE.md).
 
 The app includes contractor price books and estimate templates, a scheduled job board with status tracking and actual job costs, estimate and job reports with gross profit, printable proposals/invoices, customer approval capture and proposal questions, Good/Better/Best options, contractor branding and default markup/tax settings, private job voice notes, proposal photos, Pro subscriptions, cloud estimate drafting, branded estimate email, and automatic follow-up scheduling. Estimate drafts and media can be saved in browser storage for offline editing on that device; creating/syncing the estimate requires a connection.
 
@@ -31,14 +33,14 @@ Copy `.env.example` to `.env.local` and set the values for integrations you enab
 - Branded email and follow-ups: `RESEND_API_KEY` and `RESEND_FROM_EMAIL`, using a sender domain verified with Resend.
 - Scheduled follow-ups: Vercel Cron calls `/api/cron/followups` daily at 09:00 UTC in production. Set `CRON_SECRET` as a private Vercel environment variable; the handler verifies the `Authorization: Bearer <CRON_SECRET>` header. The app schedules a follow-up seven days after sending an estimate email, and each run handles up to 100 due messages in small concurrent batches. Preview deployments do not run Vercel Cron jobs.
 - Set `SUPABASE_SERVICE_ROLE_KEY` for signed customer approvals, proposal view tracking, Stripe webhooks, and the follow-up worker. Keep this key private and server-side.
-- In Vercel Production environment variables, set `NEXT_PUBLIC_APP_URL=https://tradeflow-app-ai.vercel.app` and set `NEXT_PUBLIC_SUPPORT_EMAIL` to a real monitored support address. Do not set a public-prefixed variable to secret-only visibility.
+- In Vercel Production environment variables, set `NEXT_PUBLIC_APP_URL=https://app.workcraftai.com` and set `NEXT_PUBLIC_SUPPORT_EMAIL` to a real monitored support address. Do not set a public-prefixed variable to secret-only visibility.
 - For Supabase Auth email, configure a verified sender and custom SMTP in the Supabase dashboard. For Resend SMTP use host `smtp.resend.com`, port `587`, username `resend`, and the Resend API key as the password. Keep credentials in the Supabase dashboard, not Git.
-- In Supabase Auth URL Configuration, set Site URL to `https://tradeflow-app-ai.vercel.app` and allow the production confirmation redirect `https://tradeflow-app-ai.vercel.app/auth/confirm`.
+- In Supabase Auth URL Configuration, set Site URL to `https://app.workcraftai.com` and allow the production confirmation redirect `https://app.workcraftai.com/auth/confirm`.
 - To prevent email scanners from consuming reset links, update Supabase Auth → Email Templates → Reset Password. Set the link to `<a href="{{ .SiteURL }}/confirm-reset?token_hash={{ .TokenHash }}&amp;type=recovery">Continue password reset</a>`. The new `/confirm-reset` page verifies the one-time token only after the user clicks its button.
 
 The app reads subscription state from Stripe webhook updates. Pro tools stay locked until the webhook records an active or trialing subscription.
 
-Customer down payments are temporarily unavailable until Stripe Connect onboarding, contractor payouts, and connected-account webhooks are implemented and verified. Stripe subscriptions for TradeFlow Pro are separate and remain available.
+Customer down payments are temporarily unavailable until Stripe Connect onboarding, contractor payouts, and connected-account webhooks are implemented and verified. Stripe subscriptions for WorkCraft AI Pro are separate and remain available.
 
 ## Getting Started
 

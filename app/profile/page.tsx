@@ -112,7 +112,7 @@ export default function ProfilePage() {
       </div>
 
       <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{planStatus === "active" || planStatus === "trialing" ? "TradeFlow Pro" : "TradeFlow Free"}</h2><p className="mt-1 text-xs text-slate-600">{planStatus === "active" || planStatus === "trialing" ? "Pro tools are enabled on this account." : "Create estimates, manage your price book, schedule jobs, and view reports."}</p></div>
+        <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{planStatus === "active" || planStatus === "trialing" ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{planStatus === "active" || planStatus === "trialing" ? "Pro tools are enabled on this account." : "Create estimates, manage your price book, schedule jobs, and view reports."}</p></div>
         {planStatus === "active" || planStatus === "trialing" ? <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{planStatus}</span> : <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : "Upgrade to Pro"}</button>}
       </section>
 

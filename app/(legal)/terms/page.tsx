@@ -3,7 +3,7 @@ export default function TermsPage() {
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
       <article className="space-y-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
         <header className="space-y-2 border-b border-slate-200 pb-6">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">TradeFlow · Legal</p>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">WorkCraft AI · Legal</p>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Terms of Service</h1>
           <p className="text-sm text-slate-600">Last updated: September 2026</p>
         </header>
@@ -18,7 +18,7 @@ export default function TermsPage() {
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-slate-900">2. Estimates and AI Drafts</h2>
           <p className="text-sm leading-7 text-slate-700">
-            Estimates and AI-generated line items are drafts to help prepare a quote. You are responsible for checking the scope, measurements, rates, taxes, and terms before sharing an estimate with a customer. TradeFlow does not guarantee that suggested quantities or prices are accurate for a specific job or location.
+            Estimates and AI-generated line items are drafts to help prepare a quote. You are responsible for checking the scope, measurements, rates, taxes, and terms before sharing an estimate with a customer. WorkCraft AI does not guarantee that suggested quantities or prices are accurate for a specific job or location.
           </p>
         </section>
 
@@ -32,7 +32,7 @@ export default function TermsPage() {
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-slate-900">4. Acceptable Use</h2>
           <p className="text-sm leading-7 text-slate-700">
-            You may not use the service for any illegal or unauthorized purpose, nor violate any laws in your jurisdiction. You are responsible for having permission to use the customer information you add to TradeFlow.
+            You may not use the service for any illegal or unauthorized purpose, nor violate any laws in your jurisdiction. You are responsible for having permission to use the customer information you add to WorkCraft AI.
           </p>
         </section>
       </article>

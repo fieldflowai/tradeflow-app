@@ -7,9 +7,18 @@ import { LanguageProvider } from "@/app/components/LanguageProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TradeFlow | Service Estimates & Invoicing",
-  description: "TradeFlow helps tradespeople create clear estimates, communicate with customers, and spend less time on admin.",
-  icons: { icon: "/tradeflow-mark.svg" },
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://app.workcraftai.com"),
+  title: "WorkCraft AI | Estimates, Proposals & Invoices",
+  applicationName: "WorkCraft AI",
+  description: "WorkCraft AI helps independent trade and service businesses prepare estimates, share proposals, and manage jobs and invoices.",
+  openGraph: {
+    type: "website",
+    siteName: "WorkCraft AI",
+    title: "WorkCraft AI | Estimates, Proposals & Invoices",
+    description: "A clearer way to move from estimate to paid invoice.",
+    url: "https://app.workcraftai.com",
+  },
+  icons: { icon: "/workcraftai-mark.svg" },
 };
 
 export default function RootLayout({

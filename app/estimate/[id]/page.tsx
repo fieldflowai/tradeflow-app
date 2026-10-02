@@ -126,7 +126,7 @@ export default function ClientEstimatePage() {
       if (!response.ok) throw new Error(result.error || "Your question could not be sent.");
       setQuestionStatus(result.emailSent
         ? "Your question was sent to the contractor. They can reply to your email address."
-        : "Your question was saved. The contractor can see it in TradeFlow; email notification is not currently available.");
+        : "Your question was saved. The contractor can see it in WorkCraft AI; email notification is not currently available.");
       setQuestionName(""); setQuestionEmail(""); setQuestionMessage("");
     } catch (error) { setQuestionStatus(error instanceof Error ? error.message : "Your question could not be sent."); }
     finally { setSendingQuestion(false); }

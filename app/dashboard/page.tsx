@@ -141,7 +141,7 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <div>
-            <h1 className="text-xl font-bold text-slate-900">TradeFlow Dashboard</h1>
+            <h1 className="text-xl font-bold text-slate-900">WorkCraft AI Dashboard</h1>
             <p className="text-xs text-slate-500 mt-0.5">
               Manage estimates, tracking, and payments
             </p>

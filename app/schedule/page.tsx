@@ -58,7 +58,7 @@ export default function SchedulePage() {
       supabase.from("jobs").select("*").order("scheduled_at", { ascending: true, nullsFirst: false }),
       supabase.from("estimates").select("id, client_name, client_email, job_address, trade, converted_job_id").eq("status", "accepted").is("converted_job_id", null).order("created_at", { ascending: false }),
     ]);
-    if (jobsResult.error) setError(`${jobsResult.error.message}. Apply the TradeFlow operations migration if the jobs table is missing.`);
+    if (jobsResult.error) setError(`${jobsResult.error.message}. Apply the WorkCraft AI operations migration if the jobs table is missing.`);
     else setJobs((jobsResult.data ?? []) as Job[]);
     if (!estimatesResult.error) setEstimates((estimatesResult.data ?? []) as Estimate[]);
     setLoading(false);
