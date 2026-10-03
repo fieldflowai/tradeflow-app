@@ -48,10 +48,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { data: ownerData } = await admin.auth.admin.getUserById(estimate.user_id);
   const businessEmail = ownerData.user?.email;
+  const { data: subscription } = await admin.from("subscriptions").select("status").eq("user_id", estimate.user_id).maybeSingle();
+  const hasProEmail = subscription?.status === "active" || subscription?.status === "trialing";
   const apiKey = process.env.RESEND_API_KEY;
   const sender = process.env.RESEND_FROM_EMAIL;
   let emailSent = false;
-  if (businessEmail && apiKey && sender) {
+  if (hasProEmail && businessEmail && apiKey && sender) {
     try {
       const mail = await fetch("https://api.resend.com/emails", {
         method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },

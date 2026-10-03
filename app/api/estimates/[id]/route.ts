@@ -115,7 +115,7 @@ export async function PUT(
 
   const { data: existing, error: lookupError } = await supabase
     .from("estimates")
-    .select("id, status")
+    .select("id, status, require_deposit, deposit_percentage, package_options")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -126,14 +126,24 @@ export async function PUT(
   if (!existing) return jsonError("Estimate not found.", 404);
   if (existing.status === "paid") return jsonError("Paid estimates cannot be edited.", 409);
 
+  const { data: subscription } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
+  const isPro = subscription?.status === "active" || subscription?.status === "trialing";
+  const requestedPackages = Array.isArray(body.package_options) ? body.package_options : [];
+  const isEnablingProOptions = (body.require_deposit === true && existing.require_deposit !== true)
+    || (existing.require_deposit === true && depositPercentage !== Number(existing.deposit_percentage))
+    || (requestedPackages.length > 0 && JSON.stringify(requestedPackages) !== JSON.stringify(existing.package_options ?? []));
+  if (!isPro && isEnablingProOptions) {
+    return jsonError("Deposit terms and package options require an active WorkCraft AI Pro subscription.", 403);
+  }
+
   const estimateUpdate: Record<string, unknown> = {
     client_name: clientName,
     client_email: clientEmail,
     client_phone: clientPhone,
     job_address: jobAddress,
-    require_deposit: body.require_deposit === true,
-    deposit_percentage: depositPercentage,
-    package_options: Array.isArray(body.package_options) ? body.package_options : [],
+    require_deposit: isPro ? body.require_deposit === true : existing.require_deposit,
+    deposit_percentage: isPro ? depositPercentage : existing.deposit_percentage,
+    package_options: isPro ? requestedPackages : existing.package_options ?? [],
     proposal_language: proposalLanguage,
     status: "pending",
     updated_at: new Date().toISOString(),
