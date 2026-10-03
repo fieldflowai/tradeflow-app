@@ -21,6 +21,7 @@ export default function ProfilePage() {
   const [markupPercentage, setMarkupPercentage] = useState("0");
   const [planStatus, setPlanStatus] = useState("free");
   const [upgrading, setUpgrading] = useState(false);
+  const [managingBilling, setManagingBilling] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -92,6 +93,23 @@ export default function ProfilePage() {
     }
   };
 
+  const handleManageBilling = async () => {
+    setManagingBilling(true); setError(null);
+    try {
+      const response = await fetch("/api/pro/portal", { method: "POST" });
+      const result = await response.json();
+      if (!response.ok || !result.url) throw new Error(result.error || "Unable to open billing settings.");
+      window.location.href = result.url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to open billing settings.");
+      setManagingBilling(false);
+    }
+  };
+
+  const hasProAccess = planStatus === "active" || planStatus === "trialing";
+  const hasBillingHistory = planStatus !== "free";
+  const needsBillingAttention = ["past_due", "unpaid", "incomplete"].includes(planStatus);
+
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto p-6">
@@ -112,8 +130,13 @@ export default function ProfilePage() {
       </div>
 
       <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{planStatus === "active" || planStatus === "trialing" ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{planStatus === "active" || planStatus === "trialing" ? "Pro tools are enabled on this account." : "Create estimates, manage your price book, schedule jobs, and view reports."}</p></div>
-        {planStatus === "active" || planStatus === "trialing" ? <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{planStatus}</span> : <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : "Upgrade to Pro"}</button>}
+        <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{hasProAccess ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{hasProAccess ? "Pro tools are enabled on this account." : "Create estimates, manage your price book, schedule jobs, and view reports."}</p></div>
+        <div className="flex flex-wrap items-center gap-2">
+          {hasProAccess && <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{planStatus}</span>}
+          {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : "Manage billing"}</button>}
+          {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : "Upgrade to Pro"}</button>}
+        </div>
+        {!hasProAccess && <p className="w-full text-xs text-slate-600">WorkCraft AI Pro is $9.99 per month. Free features remain available with no trial required.</p>}
       </section>
 
       <form
