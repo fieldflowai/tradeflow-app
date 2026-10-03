@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { emailAddressFromConfig } from "@/lib/email-address";
 import SupportForm from "./SupportForm";
 
 export const metadata: Metadata = {
@@ -43,7 +44,7 @@ const questions = [
 ];
 
 export default function SupportPage() {
-  const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@workcraftai.com";
+  const supportEmail = emailAddressFromConfig(process.env.NEXT_PUBLIC_SUPPORT_EMAIL) || "support@workcraftai.com";
 
   return (
     <div className="min-h-full bg-[linear-gradient(180deg,#f1eee5_0%,#fffdf8_420px)]">
