@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1640" height="624" viewBox="0 0 1640 624" role="img" aria-labelledby="title description">
+  <title id="title">WorkCraft AI — Keep good work moving</title>
+  <desc id="description">A WorkCraft AI social cover with the message For the people who get the work done. Keep good work moving.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8f7f1"/>
+      <stop offset="1" stop-color="#ecefe7"/>
+    </linearGradient>
+    <linearGradient id="route" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#7c9884" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#536d5d" stop-opacity=".25"/>
+    </linearGradient>
+  </defs>
+  <rect width="1640" height="624" fill="url(#bg)"/>
+  <circle cx="1320" cy="310" r="235" fill="#536d5d" fill-opacity=".035"/>
+  <circle cx="1320" cy="310" r="190" fill="none" stroke="#536d5d" stroke-opacity=".07" stroke-width="2"/>
+  <path d="M905 720c67-157 124-245 201-255 73-9 91 121 165 97 79-26 81-199 168-228 88-30 139 72 254-64" fill="none" stroke="url(#route)" stroke-width="4"/>
+  <path d="M1033 701c78-113 130-167 181-164 63 3 77 91 127 68 54-25 73-120 122-133 50-13 92 31 159-27" fill="none" stroke="#536d5d" stroke-opacity=".10" stroke-width="2"/>
+  <circle cx="1269" cy="367" r="9" fill="#e99466" fill-opacity=".7"/>
+  <circle cx="1488" cy="254" r="6" fill="#536d5d" fill-opacity=".3"/>
+  <g transform="translate(175 232)">
+    <rect x="0" y="8" width="132" height="132" rx="32" fill="#536d5d"/>
+    <path d="M25 50 45 96 65 67 84 96 107 55" fill="none" stroke="#fffefa" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="25" cy="50" r="7" fill="#e99466"/>
+    <path d="m99 39 19-6-2 20" fill="none" stroke="#e99466" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M23 123h63" fill="none" stroke="#fff" stroke-opacity=".32" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <text x="355" y="315" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="800" letter-spacing="-3" fill="#1d2925">WorkCraft<tspan dx="10" fill="#dd7144">AI</tspan></text>
+  <text x="362" y="377" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="600" fill="#536d5d">For the people who get the work done.</text>
+  <text x="362" y="425" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#1d2925">Keep good work moving.</text>
+  <path d="M362 455h72" stroke="#e99466" stroke-width="4" stroke-linecap="round"/>
+</svg>
