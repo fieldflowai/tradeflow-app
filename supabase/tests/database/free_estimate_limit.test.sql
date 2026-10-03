@@ -121,7 +121,7 @@ select is(
   'successful changes are written to the existing audit log'
 );
 select is(
-  (select details->>'previous_limit' || ':' || details->>'new_limit' from public.tradeflow_admin_audit_log where action = 'free_estimate_limit_updated' and actor_user_id = 'a1000000-0000-4000-8000-000000000003' order by created_at desc limit 1),
+  (select (details->>'previous_limit') || ':' || (details->>'new_limit') from public.tradeflow_admin_audit_log where action = 'free_estimate_limit_updated' and actor_user_id = 'a1000000-0000-4000-8000-000000000003' order by created_at desc limit 1),
   '2:4',
   'the audit entry records old and new values'
 );
