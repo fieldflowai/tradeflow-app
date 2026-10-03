@@ -4,7 +4,7 @@ Static marketing site intended to run as a **separate Vercel project** with `mar
 
 ## Before publishing
 
-- The contact section uses `support@workcraftai.com` for company and product questions.
+- The contact section points people to `https://app.workcraftai.com/support` for product FAQs and the support contact form.
 - Replace the demo-video placeholder with a real, captioned product walkthrough and poster image.
 - The selected public company name is WorkCraft AI. Attach `workcraftai.com` to this project and `app.workcraftai.com` to the app project after registering the domain and configuring DNS. The app CTA currently points to `https://app.workcraftai.com/`.
 - `robots.txt` and `sitemap.xml` are ready for Google Search Console after the custom domain resolves.
