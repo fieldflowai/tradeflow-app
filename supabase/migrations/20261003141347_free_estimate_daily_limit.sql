@@ -1,6 +1,11 @@
 -- Configurable UTC-day cap for new estimates created by free accounts.
 -- Existing estimate records remain intact; this ledger contains counters only.
 
+-- The CLI applies statements in autocommit mode unless a migration starts a
+-- transaction. Keep the backfill and trigger installation atomic so no insert
+-- can slip between them and be omitted from today's usage count.
+begin;
+
 create table public.tradeflow_app_settings (
   singleton boolean primary key default true check (singleton),
   free_daily_estimate_limit integer not null default 10
@@ -156,3 +161,5 @@ grant execute on function public.update_free_daily_estimate_limit(integer, uuid,
 comment on table public.tradeflow_app_settings is 'Private WorkCraft AI global product settings.';
 comment on column public.tradeflow_app_settings.free_daily_estimate_limit is 'Maximum newly inserted estimates per free user per UTC calendar day; seeded to 10.';
 comment on table public.tradeflow_daily_estimate_usage is 'Private atomic per-user daily estimate usage counters; retained estimate rows are not changed.';
+
+commit;
