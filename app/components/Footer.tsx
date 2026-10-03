@@ -13,6 +13,7 @@ export default function Footer() {
         <div className="flex flex-col items-center gap-3 sm:flex-row">
           <Logo className="h-8 w-8" />
           <span>{translate(language, "WorkCraft AI · For the people who get the work done. Keep good work moving.")}</span>
+          <span className="text-slate-500">{translate(language, "Veteran-owned company")}</span>
         </div>
         <nav aria-label="Footer" className="flex items-center gap-6">
           <Link href="/privacy" className="transition-colors hover:text-white">{translate(language, "Privacy")}</Link>
