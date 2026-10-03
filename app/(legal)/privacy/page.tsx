@@ -3,7 +3,7 @@ export default function PrivacyPage() {
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
       <article className="space-y-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
         <header className="space-y-2 border-b border-slate-200 pb-6">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">TradeFlow · Legal</p>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">WorkCraft AI · Legal</p>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Privacy Policy</h1>
           <p className="text-sm text-slate-600">Last updated: September 2026</p>
         </header>
@@ -11,7 +11,7 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-slate-900">1. Information We Collect</h2>
           <p className="text-sm leading-7 text-slate-700">
-            We collect account and business profile details, customer contact information, estimate line items and prices, job addresses, schedules, notes, and approval details that you enter. Supabase provides account authentication and data storage. Payment card details are handled by Stripe Checkout and are not stored by TradeFlow.
+            We collect account and business profile details, customer contact information, estimate line items and prices, job addresses, schedules, notes, and approval details that you enter. Supabase provides account authentication and data storage. Payment card details are handled by Stripe Checkout and are not stored by WorkCraft AI.
           </p>
         </section>
 
@@ -25,7 +25,7 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-slate-900">3. Estimate Email Tracking</h2>
           <p className="text-sm leading-7 text-slate-700">
-            TradeFlow records when an estimate email is sent and when its proposal link is first viewed. This supports your estimate activity history and scheduled follow-ups.
+            WorkCraft AI records when an estimate email is sent and when its proposal link is first viewed. This supports your estimate activity history and scheduled follow-ups.
           </p>
         </section>
 

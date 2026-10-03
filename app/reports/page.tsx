@@ -94,7 +94,7 @@ export default function ReportsPage() {
             <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Recent estimates</h2><p className="mt-1 text-xs text-slate-500">Your largest opportunities at a glance</p></div><Link href="/dashboard" className="text-xs font-semibold text-blue-700 underline">All estimates</Link></div>
             {estimates.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Create your first estimate to see business reports here.</p> : <div className="mt-4 divide-y divide-slate-100">{[...estimates].sort((a, b) => estimateTotal(b) - estimateTotal(a)).slice(0, 5).map((estimate) => <div key={estimate.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold">Estimate #{estimate.id.slice(0, 8)}</p><p className="text-xs capitalize text-slate-500">{estimate.status} · {new Date(estimate.created_at).toLocaleDateString()}</p></div><div className="flex items-center gap-4"><span className="text-sm font-bold">{money(estimateTotal(estimate))}</span><Link href={`/estimate/${estimate.id}`} className="text-xs font-semibold text-blue-700 underline">View</Link></div></div>)}</div>}
           </section>
-          <p className="text-xs text-slate-500">Reports are calculated from estimates and jobs saved in TradeFlow. Completed job value uses the estimate total recorded when the job was created.</p>
+          <p className="text-xs text-slate-500">Reports are calculated from estimates and jobs saved in WorkCraft AI. Completed job value uses the estimate total recorded when the job was created.</p>
         </>}
       </div>
     </main>

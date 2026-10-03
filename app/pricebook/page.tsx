@@ -38,7 +38,7 @@ export default function PriceBookPage() {
       supabase.from("estimate_templates").select("id, name, trade, line_items, package_options, require_deposit, deposit_percentage").order("name"),
     ]);
     if (itemResult.error || templateResult.error) {
-      setError("TradeFlow setup is needed for the price book and templates. Apply the operations migration in supabase/migrations.");
+      setError("WorkCraft AI setup is needed for the price book and templates. Apply the operations migration in supabase/migrations.");
     } else {
       setItems((itemResult.data ?? []) as PriceItem[]);
       setTemplates((templateResult.data ?? []) as EstimateTemplate[]);

@@ -397,7 +397,7 @@ export default function CreateEstimatePage() {
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
           <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">TradeFlow / Estimates</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">WorkCraft AI / Estimates</p>
               <h1 className="mt-1 text-2xl font-bold text-slate-900">Create an estimate</h1>
               <p className="mt-1 text-sm text-slate-500">Build a clear, editable quote for your next job.</p>
             </div>
