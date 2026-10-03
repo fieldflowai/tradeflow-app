@@ -77,3 +77,6 @@ jobs:
 
       - name: Run database security tests
         run: supabase test db
+
+      - name: Verify atomic free estimate limit under concurrency
+        run: npm run test:db:quota-concurrency

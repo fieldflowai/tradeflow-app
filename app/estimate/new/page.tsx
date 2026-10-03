@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { generateLocalEstimate } from "@/lib/localEstimator";
 import { applyPriceBookRates } from "@/lib/priceBookPricing.mjs";
+import { isFreeEstimateLimitError } from "@/lib/free-estimate-limit.mjs";
 import { clearOfflineEstimateDraft, loadOfflineEstimateDraft, saveOfflineEstimateDraft } from "@/lib/offlineEstimateDraft";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 
@@ -369,7 +370,12 @@ export default function CreateEstimatePage() {
       localStorage.removeItem("tradeflow-unsent-estimate-v1");
       router.push(`/estimate/${est.id}`);
     } catch (err: unknown) {
-      alert(createdEstimateId ? `Estimate ${createdEstimateId} was created, but a later save step failed. Open it from your dashboard; do not create it again. Details: ${(err instanceof Error ? err.message : String(err))}` : "Error creating estimate: " + (err instanceof Error ? err.message : String(err)));
+      const message = err instanceof Error ? err.message : String(err);
+      alert(createdEstimateId
+        ? `Estimate ${createdEstimateId} was created, but a later save step failed. Open it from your dashboard; do not create it again. Details: ${message}`
+        : isFreeEstimateLimitError(err)
+          ? "You’ve reached today’s free estimate limit. Your allowance resets at midnight UTC. You can save a device draft now or try again after the reset."
+          : "Error creating estimate: " + message);
     } finally {
       setSaving(false);
     }
