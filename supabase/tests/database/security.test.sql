@@ -11,7 +11,8 @@ select ok(
     from unnest(array[
       'subscriptions', 'estimate_email_events', 'price_book_items',
       'estimate_templates', 'jobs', 'proposal_questions',
-      'estimate_attachments', 'estimates', 'line_items'
+      'estimate_attachments', 'estimates', 'line_items',
+      'tradeflow_app_settings', 'tradeflow_daily_estimate_usage'
     ]) as tables(table_name)
     cross join unnest(array[
       'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
@@ -29,7 +30,8 @@ select ok(
       and tablename = any(array[
         'subscriptions', 'estimate_email_events', 'price_book_items',
         'estimate_templates', 'jobs', 'proposal_questions',
-        'estimate_attachments', 'estimates', 'line_items'
+        'estimate_attachments', 'estimates', 'line_items',
+        'tradeflow_app_settings', 'tradeflow_daily_estimate_usage'
       ])
       and roles && array['anon'::name, 'public'::name]
   ),
@@ -42,7 +44,8 @@ select ok(
     from unnest(array[
       'subscriptions', 'estimate_email_events', 'price_book_items',
       'estimate_templates', 'jobs', 'proposal_questions',
-      'estimate_attachments', 'estimates', 'line_items'
+      'estimate_attachments', 'estimates', 'line_items',
+      'tradeflow_app_settings', 'tradeflow_daily_estimate_usage'
     ]) as tables(table_name)
     where not (
       select c.relrowsecurity
