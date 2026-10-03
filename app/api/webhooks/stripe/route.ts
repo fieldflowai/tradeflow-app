@@ -8,6 +8,12 @@ function getPeriodEnd(subscription: Stripe.Subscription) {
   return latestPeriodEnd ? new Date(latestPeriodEnd * 1000).toISOString() : null;
 }
 
+function getInvoiceSubscriptionId(invoice: Stripe.Invoice) {
+  if (invoice.parent?.type !== "subscription_details" || !invoice.parent.subscription_details) return null;
+  const subscription = invoice.parent.subscription_details.subscription;
+  return typeof subscription === "string" ? subscription : subscription.id;
+}
+
 export async function POST(request: Request) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -28,6 +34,25 @@ export async function POST(request: Request) {
   }
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, { auth: { persistSession: false } });
+
+  async function syncSubscription(subscriptionId: string) {
+    // Read the current Stripe object so retries and out-of-order event delivery
+    // cannot roll local subscription status back to an older event snapshot.
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const userId = subscription.metadata.user_id;
+    if (!userId) return false;
+    const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+    const { error } = await admin.from("subscriptions").upsert({
+      user_id: userId,
+      stripe_customer_id: customerId,
+      stripe_subscription_id: subscription.id,
+      status: subscription.status,
+      current_period_end: getPeriodEnd(subscription),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+    if (error) throw error;
+    return true;
+  }
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
@@ -51,20 +76,19 @@ export async function POST(request: Request) {
     }
   }
 
-  if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+  if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
     const subscription = event.data.object as Stripe.Subscription;
-    const userId = subscription.metadata.user_id;
-    if (!userId) return NextResponse.json({ received: true, ignored: "subscription has no TradeFlow user metadata" });
-    const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
-    const { error } = await admin.from("subscriptions").upsert({
-      user_id: userId,
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscription.id,
-      status: subscription.status,
-      current_period_end: getPeriodEnd(subscription),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const synced = await syncSubscription(subscription.id);
+    if (!synced) return NextResponse.json({ received: true, ignored: "subscription has no WorkCraft AI user metadata" });
+  }
+
+  if (event.type === "invoice.paid" || event.type === "invoice.payment_failed" || event.type === "invoice.payment_action_required") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const subscriptionId = getInvoiceSubscriptionId(invoice);
+    if (subscriptionId) {
+      const synced = await syncSubscription(subscriptionId);
+      if (!synced) return NextResponse.json({ received: true, ignored: "subscription has no WorkCraft AI user metadata" });
+    }
   }
 
   return NextResponse.json({ received: true });

@@ -17,8 +17,11 @@ export async function POST(request: Request) {
   const proPriceId = process.env.STRIPE_PRO_PRICE_ID;
   if (!stripeKey || !proPriceId) return NextResponse.json({ error: "Set STRIPE_SECRET_KEY and STRIPE_PRO_PRICE_ID to enable Pro billing." }, { status: 503 });
 
-  const { data: currentPlan } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
+  const { data: currentPlan } = await supabase.from("subscriptions").select("status, stripe_customer_id").eq("user_id", user.id).maybeSingle();
   if (["active", "trialing"].includes(currentPlan?.status ?? "")) return NextResponse.json({ error: "Your account already has Pro." }, { status: 409 });
+  if (currentPlan?.stripe_customer_id && ["past_due", "unpaid", "incomplete"].includes(currentPlan.status)) {
+    return NextResponse.json({ error: "Use Manage billing to resolve your existing subscription before starting another." }, { status: 409 });
+  }
 
   const stripe = new Stripe(stripeKey);
   const origin = new URL(request.url).origin;
