@@ -13,15 +13,22 @@ export default function ReportsPage() {
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [lines, setLines] = useState<LineItem[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [isPro, setIsPro] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const loadReport = useCallback(async () => {
     setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: subscription } = user
+      ? await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle()
+      : { data: null };
+    const pro = subscription?.status === "active" || subscription?.status === "trialing";
+    setIsPro(pro);
     const [estimateResult, lineResult, jobResult] = await Promise.all([
       supabase.from("estimates").select("id, status, created_at").order("created_at", { ascending: false }),
       supabase.from("line_items").select("estimate_id, quantity, unit_price"),
-      supabase.from("jobs").select("status, quoted_total, actual_cost, scheduled_at"),
+      pro ? supabase.from("jobs").select("status, quoted_total, actual_cost, scheduled_at") : Promise.resolve({ data: [], error: null }),
     ]);
     if (estimateResult.error || lineResult.error) setError("Could not load estimate data. Check your Supabase connection and permissions.");
     else {
@@ -64,17 +71,17 @@ export default function ReportsPage() {
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-blue-700">Business overview</p><h1 className="mt-1 text-2xl font-bold">Reports</h1><p className="mt-1 text-sm text-slate-600">Understand your estimate pipeline and completed work.</p></div>
-          <div className="flex gap-2"><Link href="/schedule" className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Jobs & schedule</Link><button onClick={() => void loadReport()} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500">Refresh</button></div>
+          <div className="flex gap-2"><Link href={isPro ? "/schedule" : "/profile"} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">{isPro ? "Jobs & schedule" : "Unlock job reports"}</Link><button onClick={() => void loadReport()} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500">Refresh</button></div>
         </header>
 
         {error && <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{error}</p>}
         {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">Calculating reports…</div> : <>
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <section className={`grid gap-4 sm:grid-cols-2 ${isPro ? "xl:grid-cols-5" : "xl:grid-cols-3"}`}>
             <Metric label="Estimated pipeline" value={money(pipeline)} note={`${estimates.length} estimates`} />
             <Metric label="Accepted estimate value" value={money(wonValue)} note={`${accepted.length} accepted or paid`} />
             <Metric label="Acceptance rate" value={`${acceptanceRate}%`} note={`${sentOrDecided.length} active decisions`} />
-            <Metric label="Completed job value" value={money(completedValue)} note={`${completedJobs.length} completed jobs`} />
-            <Metric label="Gross profit" value={money(grossProfit)} note={completedCost ? `${grossMargin}% margin · costs entered` : "Enter actual costs on the job board"} />
+            {isPro && <Metric label="Completed job value" value={money(completedValue)} note={`${completedJobs.length} completed jobs`} />}
+            {isPro && <Metric label="Gross profit" value={money(grossProfit)} note={completedCost ? `${grossMargin}% margin · costs entered` : "Enter actual costs on the job board"} />}
           </section>
 
           <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">

@@ -40,6 +40,7 @@ export default function SchedulePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isPro, setIsPro] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -54,6 +55,12 @@ export default function SchedulePage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setIsPro(false); setLoading(false); return; }
+    const { data: subscription } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
+    const pro = subscription?.status === "active" || subscription?.status === "trialing";
+    setIsPro(pro);
+    if (!pro) { setJobs([]); setEstimates([]); setLoading(false); return; }
     const [jobsResult, estimatesResult] = await Promise.all([
       supabase.from("jobs").select("*").order("scheduled_at", { ascending: true, nullsFirst: false }),
       supabase.from("estimates").select("id, client_name, client_email, job_address, trade, converted_job_id").eq("status", "accepted").is("converted_job_id", null).order("created_at", { ascending: false }),
@@ -169,6 +176,12 @@ export default function SchedulePage() {
     <LocalizedTree>
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 md:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
+        {!loading && !isPro ? <section className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-blue-700">WorkCraft AI Pro</p>
+          <h1 className="mt-2 text-2xl font-bold">Scheduling and job tracking are Pro features</h1>
+          <p className="mt-3 text-sm text-slate-600">Upgrade to schedule jobs, track job costs, and manage invoice status. Your existing data is preserved and available again if Pro is reactivated.</p>
+          <Link href="/profile" className="mt-5 inline-flex rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500">View plans and upgrade</Link>
+        </section> : <>
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.15em] text-blue-700">Operations</p>
@@ -232,6 +245,7 @@ export default function SchedulePage() {
             </div>
           )}
         </section>
+        </>}
       </div>
     </main>
     </LocalizedTree>

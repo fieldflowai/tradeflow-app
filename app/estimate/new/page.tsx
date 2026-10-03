@@ -309,6 +309,7 @@ export default function CreateEstimatePage() {
     let createdEstimateId: string | null = null;
     try {
       if (!navigator.onLine) throw new Error("You are offline. Save the draft on this device, then reconnect to create and upload it.");
+      if (attachments.length > 0 && !isProSubscriber) throw new Error("Photo and voice-note uploads require Pro. Your saved draft remains on this device; remove its attachments or upgrade to continue.");
       const invalidAttachment = attachments.find(({ file, mediaType }) => file.size > (mediaType === "photo" ? 8 * 1024 * 1024 : 15 * 1024 * 1024));
       if (invalidAttachment) throw new Error(`${invalidAttachment.file.name} exceeds the ${invalidAttachment.mediaType === "photo" ? "8 MB photo" : "15 MB voice note"} limit.`);
       const { data: { user } } = await supabase.auth.getUser();
@@ -497,8 +498,8 @@ export default function CreateEstimatePage() {
 
           <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="text-sm font-semibold text-slate-900">Field photos & voice note</h2><p className="mt-1 text-xs text-slate-600">Attach up to 6 job photos and one recorded voice note. These are saved privately and only photos appear on the proposal.</p></div>
-              <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Add photos<input type="file" accept="image/jpeg,image/png,image/webp,image/heic" capture="environment" multiple className="sr-only" onChange={(event) => {
+              <div><h2 className="text-sm font-semibold text-slate-900">Field photos & voice note {isProSubscriber ? "" : "· Pro"}</h2><p className="mt-1 text-xs text-slate-600">{isProSubscriber ? "Attach up to 6 job photos and one recorded voice note. These are saved privately and only photos appear on the proposal." : "Private photo and voice-note storage is included with Pro."}</p></div>
+              {isProSubscriber ? <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Add photos<input type="file" accept="image/jpeg,image/png,image/webp,image/heic" capture="environment" multiple className="sr-only" onChange={(event) => {
                 const selected = Array.from(event.target.files ?? []);
                 const photos = selected.filter((file) => file.type.startsWith("image/") && file.size <= 8 * 1024 * 1024);
                 setAttachments((current) => {
@@ -508,8 +509,8 @@ export default function CreateEstimatePage() {
                 });
                 setDraftMessage(photos.length !== selected.length ? "Only supported photos up to 8 MB each were added." : selected.length > photos.length || attachments.filter((item) => item.mediaType === "photo").length + photos.length > 6 ? "Up to 6 photos can be attached." : "");
                 event.currentTarget.value = "";
-              }} /></label>
-              {recording ? <button type="button" onClick={stopVoiceNote} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white">Stop recording</button> : <button type="button" onClick={() => void startVoiceNote()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Record voice note</button>}
+              }} /></label> : <Link href="/profile" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-blue-700">View Pro</Link>}
+              {isProSubscriber && (recording ? <button type="button" onClick={stopVoiceNote} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white">Stop recording</button> : <button type="button" onClick={() => void startVoiceNote()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Record voice note</button>)}
             </div>
             {recording && <p role="status" className="mt-3 text-xs font-medium text-red-700">Recording… Tap “Stop recording” to attach it.</p>}
             {!!attachments.length && <ul className="mt-3 space-y-1.5">{attachments.map(({ file, mediaType }, index) => <li key={`${file.name}-${index}`} className="flex items-center justify-between rounded-md bg-white px-3 py-2 text-xs text-slate-700"><span>{mediaType === "photo" ? "Photo" : "Voice note"}: {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</span><button type="button" onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="font-semibold text-red-700 underline">Remove</button></li>)}</ul>}
@@ -659,7 +660,7 @@ export default function CreateEstimatePage() {
                 </div>
               )}
             </div>
-            {!isProSubscriber && <p className="text-xs text-slate-500">Collect deposits through Stripe with Pro. <Link href="/profile" className="font-semibold text-blue-700 underline">View Pro</Link></p>}
+            {!isProSubscriber && <p className="text-xs text-slate-500">Deposit terms are a Pro proposal option. WorkCraft AI does not collect customer payments yet. <Link href="/profile" className="font-semibold text-blue-700 underline">View Pro</Link></p>}
 
             <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-sm">
               <span className="text-slate-600">Subtotal:</span>
