@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(19);
+select plan(18);
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.tradeflow_app_settings'::regclass)
