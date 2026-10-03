@@ -8,14 +8,14 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://app.workcraftai.com"),
-  title: "WorkCraft AI | Estimates, Proposals & Invoices",
+  title: "WorkCraft AI — Keep good work moving",
   applicationName: "WorkCraft AI",
-  description: "WorkCraft AI helps independent trade and service businesses prepare estimates, share proposals, and manage jobs and invoices.",
+  description: "For the people who get the work done. WorkCraft AI helps independent trade and service businesses prepare estimates, share proposals, and manage jobs and invoices.",
   openGraph: {
     type: "website",
     siteName: "WorkCraft AI",
-    title: "WorkCraft AI | Estimates, Proposals & Invoices",
-    description: "A clearer way to move from estimate to paid invoice.",
+    title: "WorkCraft AI — Keep good work moving",
+    description: "For the people who get the work done. Keep good work moving.",
     url: "https://app.workcraftai.com",
   },
   icons: { icon: "/workcraftai-mark.svg" },
