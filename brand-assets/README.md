@@ -1,6 +1,6 @@
 # WorkCraft AI logo files
 
-The logo system uses one sage and orange mark with the WorkCraft AI wordmark. The two tagline lines are:
+The logo system uses a continuous W-shaped route that moves forward into an arrow, representing WorkCraft AI and the idea of keeping work moving. It is drawn in the same sage and orange palette with the WorkCraft AI wordmark. The two tagline lines are:
 
 - For the people who get the work done.
 - Keep good work moving.
