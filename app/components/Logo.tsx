@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 interface LogoProps {
   className?: string;
@@ -27,12 +28,10 @@ export default function Logo({
           <span className="text-[18px] font-extrabold tracking-[-0.055em] text-white transition-colors group-hover:text-orange-200">
             WorkCraft <span className="text-orange-400">AI</span>
           </span>
-          <span className="mt-1 text-[8px] font-semibold tracking-[0.01em] text-slate-300">
-            For the people who get the work done.
-          </span>
-          <span className="mt-0.5 text-[8px] font-semibold tracking-[0.01em] text-slate-300">
-            Keep good work moving.
-          </span>
+          <LocalizedTree>
+            <span className="mt-1 text-[8px] font-semibold tracking-[0.01em] text-slate-300">For the people who get the work done.</span>
+            <span className="mt-0.5 text-[8px] font-semibold tracking-[0.01em] text-slate-300">Keep good work moving.</span>
+          </LocalizedTree>
         </span>
       )}
     </Link>

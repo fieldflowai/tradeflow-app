@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
 
 type JobStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
 interface Job {
@@ -37,6 +37,8 @@ const statusLabels: Record<JobStatus, string> = {
 };
 
 export default function SchedulePage() {
+  const { language } = useLanguage();
+  const locale = language === "es" ? "es-US" : "en-US";
   const [jobs, setJobs] = useState<Job[]>([]);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -231,7 +233,7 @@ export default function SchedulePage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{job.title}</h3><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">{statusLabels[job.status]}</span></div>
                     <p className="mt-1 text-sm text-slate-600">{job.client_name || "No customer"}{job.job_address ? ` · ${job.job_address}` : ""}</p>
-                    <p className="mt-1 text-xs text-slate-500">{job.scheduled_at ? new Date(job.scheduled_at).toLocaleString() : "No date set"}{job.quoted_total ? ` · $${Number(job.quoted_total).toFixed(2)}` : ""}</p>
+                    <p className="mt-1 text-xs text-slate-500">{job.scheduled_at ? new Date(job.scheduled_at).toLocaleString(locale) : "No date set"}{job.quoted_total ? ` · ${new Intl.NumberFormat(locale, { style: "currency", currency: "USD" }).format(Number(job.quoted_total))}` : ""}</p>
                     <label className="mt-2 inline-flex items-center gap-2 text-[11px] font-medium text-slate-600">Reschedule<input type="datetime-local" defaultValue={job.scheduled_at ? new Date(job.scheduled_at).toISOString().slice(0, 16) : ""} onBlur={(event) => { const value = event.target.value; if (value !== (job.scheduled_at ? new Date(job.scheduled_at).toISOString().slice(0, 16) : "")) void updateSchedule(job.id, value); }} className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs" /></label>
                     {job.notes && <p className="mt-2 text-sm text-slate-600">{job.notes}</p>}
                     <label className="mt-2 inline-flex items-center gap-2 text-[11px] font-medium text-slate-600">Actual job cost<input type="number" min="0" step="0.01" defaultValue={Number(job.actual_cost || 0)} onBlur={(event) => { if (Number(event.target.value) !== Number(job.actual_cost || 0)) void updateActualCost(job.id, event.target.value); }} className="w-28 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs" /></label>

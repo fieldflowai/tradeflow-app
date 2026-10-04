@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
 
 type Estimate = { id: string; status: string; created_at: string };
 type LineItem = { estimate_id: string; quantity: number; unit_price: number };
 type Job = { status: string; quoted_total: number; actual_cost: number; scheduled_at: string | null };
 
 export default function ReportsPage() {
+  const { language } = useLanguage();
+  const locale = language === "es" ? "es-US" : "en-US";
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [lines, setLines] = useState<LineItem[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -59,7 +61,7 @@ export default function ReportsPage() {
   const monthBuckets = Array.from({ length: 6 }, (_, index) => {
     const date = new Date(); date.setDate(1); date.setMonth(date.getMonth() - (5 - index));
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-    const label = date.toLocaleDateString(undefined, { month: "short" });
+    const label = date.toLocaleDateString(locale, { month: "short" });
     const amount = estimates.filter((estimate) => estimate.created_at?.startsWith(key)).reduce((sum, estimate) => sum + estimateTotal(estimate), 0);
     return { key, label, amount };
   });
@@ -77,11 +79,11 @@ export default function ReportsPage() {
         {error && <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{error}</p>}
         {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">Calculating reports…</div> : <>
           <section className={`grid gap-4 sm:grid-cols-2 ${isPro ? "xl:grid-cols-5" : "xl:grid-cols-3"}`}>
-            <Metric label="Estimated pipeline" value={money(pipeline)} note={`${estimates.length} estimates`} />
-            <Metric label="Accepted estimate value" value={money(wonValue)} note={`${accepted.length} accepted or paid`} />
+            <Metric label="Estimated pipeline" value={money(pipeline, locale)} note={`${estimates.length} estimates`} />
+            <Metric label="Accepted estimate value" value={money(wonValue, locale)} note={`${accepted.length} accepted or paid`} />
             <Metric label="Acceptance rate" value={`${acceptanceRate}%`} note={`${sentOrDecided.length} active decisions`} />
-            {isPro && <Metric label="Completed job value" value={money(completedValue)} note={`${completedJobs.length} completed jobs`} />}
-            {isPro && <Metric label="Gross profit" value={money(grossProfit)} note={completedCost ? `${grossMargin}% margin · costs entered` : "Enter actual costs on the job board"} />}
+            {isPro && <Metric label="Completed job value" value={money(completedValue, locale)} note={`${completedJobs.length} completed jobs`} />}
+            {isPro && <Metric label="Gross profit" value={money(grossProfit, locale)} note={completedCost ? `${grossMargin}% margin · costs entered` : "Enter actual costs on the job board"} />}
           </section>
 
           <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
@@ -99,7 +101,7 @@ export default function ReportsPage() {
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Recent estimates</h2><p className="mt-1 text-xs text-slate-500">Your largest opportunities at a glance</p></div><Link href="/dashboard" className="text-xs font-semibold text-blue-700 underline">All estimates</Link></div>
-            {estimates.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Create your first estimate to see business reports here.</p> : <div className="mt-4 divide-y divide-slate-100">{[...estimates].sort((a, b) => estimateTotal(b) - estimateTotal(a)).slice(0, 5).map((estimate) => <div key={estimate.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold">Estimate #{estimate.id.slice(0, 8)}</p><p className="text-xs capitalize text-slate-500">{estimate.status} · {new Date(estimate.created_at).toLocaleDateString()}</p></div><div className="flex items-center gap-4"><span className="text-sm font-bold">{money(estimateTotal(estimate))}</span><Link href={`/estimate/${estimate.id}`} className="text-xs font-semibold text-blue-700 underline">View</Link></div></div>)}</div>}
+            {estimates.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Create your first estimate to see business reports here.</p> : <div className="mt-4 divide-y divide-slate-100">{[...estimates].sort((a, b) => estimateTotal(b) - estimateTotal(a)).slice(0, 5).map((estimate) => <div key={estimate.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold">Estimate #{estimate.id.slice(0, 8)}</p><p className="text-xs capitalize text-slate-500">{estimate.status} · {new Date(estimate.created_at).toLocaleDateString(locale)}</p></div><div className="flex items-center gap-4"><span className="text-sm font-bold">{money(estimateTotal(estimate), locale)}</span><Link href={`/estimate/${estimate.id}`} className="text-xs font-semibold text-blue-700 underline">View</Link></div></div>)}</div>}
           </section>
           <p className="text-xs text-slate-500">Reports are calculated from estimates and jobs saved in WorkCraft AI. Completed job value uses the estimate total recorded when the job was created.</p>
         </>}
@@ -109,6 +111,6 @@ export default function ReportsPage() {
   );
 }
 
-function money(value: number) { return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value); }
+function money(value: number, locale: string) { return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value); }
 function moneyShort(value: number) { return value >= 1000 ? `$${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k` : `$${Math.round(value)}`; }
 function Metric({ label, value, note }: { label: string; value: string; note: string }) { return <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-3 text-3xl font-bold tabular-nums text-slate-900">{value}</p><p className="mt-2 text-xs text-slate-500">{note}</p></div>; }
