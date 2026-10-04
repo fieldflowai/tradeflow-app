@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Logo from "@/app/components/Logo";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 function ConfirmResetLink() {
   const searchParams = useSearchParams();
@@ -10,6 +11,7 @@ function ConfirmResetLink() {
   const isRecovery = searchParams.get("type") === "recovery";
 
   return (
+    <LocalizedTree>
     <main className="flex min-h-screen flex-col justify-center bg-slate-950 px-4 py-12 text-slate-100 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-md flex-col items-center">
         <Logo className="h-10 w-10" />
@@ -32,6 +34,7 @@ function ConfirmResetLink() {
         )}
       </section>
     </main>
+    </LocalizedTree>
   );
 }
 

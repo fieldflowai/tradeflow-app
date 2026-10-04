@@ -1,5 +1,8 @@
+import { LocalizedTree } from "@/app/components/LanguageProvider";
+
 export default function TermsPage() {
   return (
+    <LocalizedTree>
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
       <article className="space-y-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
         <header className="space-y-2 border-b border-slate-200 pb-6">
@@ -37,5 +40,6 @@ export default function TermsPage() {
         </section>
       </article>
     </div>
+    </LocalizedTree>
   );
 }

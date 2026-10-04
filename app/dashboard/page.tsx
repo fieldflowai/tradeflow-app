@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
 
 interface Estimate {
   id: string;
@@ -23,6 +23,8 @@ interface Estimate {
 interface ProposalQuestion { id: string; estimate_id: string; customer_name: string; customer_email: string; message: string; created_at: string; read_at: string | null; }
 
 export default function DashboardPage() {
+  const { language } = useLanguage();
+  const locale = language === "es" ? "es-US" : "en-US";
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentTab, setCurrentTab] = useState<"active" | "archived">("active");
@@ -164,7 +166,7 @@ export default function DashboardPage() {
         {questions.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between"><h2 className="text-base font-bold text-slate-900">Customer questions</h2><span className="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-800">{questions.filter((item) => !item.read_at).length} unread</span></div>
           <div className="mt-3 divide-y divide-slate-100">{questions.map((question) => <article key={question.id} className="py-3 first:pt-0 last:pb-0">
-            <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-semibold text-slate-900">{question.customer_name} <span className="font-normal text-slate-500">· {new Date(question.created_at).toLocaleString()}</span></p><a className="text-xs text-blue-700 underline" href={`mailto:${encodeURIComponent(question.customer_email)}`}>{question.customer_email}</a><p className="mt-1 text-sm text-slate-700">{question.message}</p></div><div className="flex gap-3 text-xs"><Link href={`/estimate/${encodeURIComponent(question.estimate_id)}`} className="font-semibold text-blue-700 underline">View proposal</Link>{!question.read_at && <button type="button" onClick={() => void markQuestionRead(question)} className="font-semibold text-slate-600 underline">Mark read</button>}</div></div>
+            <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-semibold text-slate-900">{question.customer_name} <span className="font-normal text-slate-500">· {new Date(question.created_at).toLocaleString(locale)}</span></p><a className="text-xs text-blue-700 underline" href={`mailto:${encodeURIComponent(question.customer_email)}`}>{question.customer_email}</a><p className="mt-1 text-sm text-slate-700">{question.message}</p></div><div className="flex gap-3 text-xs"><Link href={`/estimate/${encodeURIComponent(question.estimate_id)}`} className="font-semibold text-blue-700 underline">View proposal</Link>{!question.read_at && <button type="button" onClick={() => void markQuestionRead(question)} className="font-semibold text-slate-600 underline">Mark read</button>}</div></div>
           </article>)}</div>
         </section>}
 
@@ -230,7 +232,7 @@ export default function DashboardPage() {
                         {est.job_address || "—"}
                       </td>
                       <td className="p-3.5 text-slate-500 text-xs">
-                        {new Date(est.created_at).toLocaleDateString()}
+                        {new Date(est.created_at).toLocaleDateString(locale)}
                       </td>
                       <td className="p-3.5">
                         <span
@@ -252,7 +254,7 @@ export default function DashboardPage() {
                         </Link>
                         {isPro ? <button onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="text-xs font-semibold text-blue-700 underline disabled:opacity-50">{sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client"}</button> : <Link href="/profile" className="text-xs font-semibold text-slate-500 underline">Email · Pro</Link>}
                         {emailEvents[est.id] && <span className="text-[10px] font-semibold uppercase text-slate-500">{emailEvents[est.id]}</span>}
-                        {est.followup_at && <span className="text-[10px] text-slate-500">{est.followup_sent_at ? "Follow-up sent" : `Follow-up ${new Date(est.followup_at).toLocaleDateString()}`}</span>}
+                        {est.followup_at && <span className="text-[10px] text-slate-500">{est.followup_sent_at ? "Follow-up sent" : `Follow-up ${new Date(est.followup_at).toLocaleDateString(locale)}`}</span>}
                         {est.proposal_viewed_at && <span className="text-[10px] font-semibold text-green-700">Viewed</span>}
 
                         {est.is_archived ? (

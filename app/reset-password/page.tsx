@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import Logo from "@/app/components/Logo";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -40,6 +41,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
+    <LocalizedTree>
     <main className="flex min-h-screen flex-col justify-center bg-slate-950 px-4 py-12 text-slate-100 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-md flex-col items-center">
         <Logo className="h-10 w-10" />
@@ -65,5 +67,6 @@ export default function ResetPasswordPage() {
         <p className="mt-6 text-center text-sm text-slate-400"><Link href="/login" className="font-medium text-blue-400 hover:text-blue-300">Back to sign in</Link></p>
       </section>
     </main>
+    </LocalizedTree>
   );
 }

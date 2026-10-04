@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 type SubmissionState = { kind: "success" | "error"; message: string } | null;
 
@@ -33,6 +34,7 @@ export default function SupportForm() {
   }
 
   return (
+    <LocalizedTree>
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-2">
         <label className="block text-sm font-semibold text-slate-800">
@@ -69,5 +71,6 @@ export default function SupportForm() {
         {pending ? "Sending…" : "Send message"}
       </button>
     </form>
+    </LocalizedTree>
   );
 }

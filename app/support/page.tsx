@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { emailAddressFromConfig } from "@/lib/email-address";
 import SupportForm from "./SupportForm";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 export const metadata: Metadata = {
   title: "Support | WorkCraft AI",
@@ -47,6 +48,7 @@ export default function SupportPage() {
   const supportEmail = emailAddressFromConfig(process.env.NEXT_PUBLIC_SUPPORT_EMAIL) || "support@workcraftai.com";
 
   return (
+    <LocalizedTree>
     <div className="min-h-full bg-[linear-gradient(180deg,#f1eee5_0%,#fffdf8_420px)]">
       <section className="mx-auto max-w-6xl px-4 pb-12 pt-12 sm:px-6 sm:pt-16 lg:px-8">
         <Link href="https://workcraftai.com/" className="text-sm font-semibold text-slate-600 transition hover:text-orange-800">← WorkCraft AI home</Link>
@@ -88,5 +90,6 @@ export default function SupportPage() {
         </div>
       </section>
     </div>
+    </LocalizedTree>
   );
 }

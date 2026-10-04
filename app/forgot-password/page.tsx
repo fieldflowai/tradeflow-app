@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import Logo from "@/app/components/Logo";
+import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 export default function ForgotPasswordPage() {
   return <Suspense fallback={<main className="min-h-screen bg-slate-950" />}><ForgotPasswordForm /></Suspense>;
@@ -35,6 +36,7 @@ function ForgotPasswordForm() {
   };
 
   return (
+    <LocalizedTree>
     <main className="flex min-h-screen flex-col justify-center bg-slate-950 px-4 py-12 text-slate-100 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-md flex-col items-center">
         <Logo className="h-10 w-10" />
@@ -69,5 +71,6 @@ function ForgotPasswordForm() {
         </p>
       </section>
     </main>
+    </LocalizedTree>
   );
 }
