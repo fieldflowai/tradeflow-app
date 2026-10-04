@@ -34,6 +34,7 @@ interface Estimate {
 interface ContractorBrand { businessName: string; phone: string; address: string; logoUrl: string; brandColor: string; }
 interface ProposalPhoto { id: string; url: string; }
 interface OwnerAttachment { id: string; media_type: "photo" | "voice"; url: string; }
+interface PaymentSummary { amountPaidCents: number; totalCents: number; available: boolean; }
 
 interface EstimatePackage {
   name: string;
@@ -65,6 +66,9 @@ export default function ClientEstimatePage() {
   const [questionStatus, setQuestionStatus] = useState("");
   const [sendingQuestion, setSendingQuestion] = useState(false);
   const [questionHoneypot, setQuestionHoneypot] = useState("");
+  const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>({ amountPaidCents: 0, totalCents: 0, available: false });
+  const [startingPayment, setStartingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
 
   useEffect(() => {
     async function fetchEstimateDetails() {
@@ -77,6 +81,7 @@ export default function ClientEstimatePage() {
         const estData = result.estimate as Estimate;
 
         setEstimate(estData);
+        if (result.paymentSummary) setPaymentSummary(result.paymentSummary as PaymentSummary);
         setWasConverted(result.converted === true);
         if (result.contractor) setContractor(result.contractor as ContractorBrand);
         if (Array.isArray(result.photos)) setPhotos(result.photos as ProposalPhoto[]);
@@ -130,6 +135,23 @@ export default function ClientEstimatePage() {
       setQuestionName(""); setQuestionEmail(""); setQuestionMessage("");
     } catch (error) { setQuestionStatus(error instanceof Error ? error.message : "Your question could not be sent."); }
     finally { setSendingQuestion(false); }
+  };
+
+  const startCustomerPayment = async (kind: "deposit" | "balance") => {
+    setStartingPayment(true); setPaymentError("");
+    try {
+      const response = await fetch(`/api/proposals/${encodeURIComponent(id)}/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.url) throw new Error(result.error || "Checkout could not be started.");
+      window.location.assign(result.url);
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : "Checkout could not be started.");
+      setStartingPayment(false);
+    }
   };
 
   const handleApproveAndPay = async () => {
@@ -363,12 +385,21 @@ export default function ClientEstimatePage() {
           {/* Client Action Button */}
           {estimate.status === "paid" ? (
             <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl text-center font-semibold text-sm">
-              ✓ Deposit Paid & Proposal Accepted
+              ✓ Estimate paid in full. Thank you.
             </div>
           ) : estimate.status === "accepted" ? (
             <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl text-center font-semibold text-sm">
               ✓ Your approval has been recorded. The contractor will contact you about payment and next steps.
               {isOwner && (wasConverted ? <p className="mt-2 text-xs font-medium">This estimate has already been added to your job schedule.</p> : <button type="button" onClick={() => router.push(`/schedule?estimate=${encodeURIComponent(id)}`)} className="mt-3 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white">Schedule this approved job</button>)}
+              {paymentSummary.available && paymentSummary.totalCents > paymentSummary.amountPaidCents && <div className="mt-4 border-t border-green-200 pt-4 text-left">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>Paid so far</span><strong>${(paymentSummary.amountPaidCents / 100).toFixed(2)}</strong></div>
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs"><span>Remaining balance</span><strong>${((paymentSummary.totalCents - paymentSummary.amountPaidCents) / 100).toFixed(2)}</strong></div>
+                {paymentError && <p role="alert" className="mt-2 rounded-md bg-red-50 p-2 text-xs text-red-800">{paymentError}</p>}
+                <div className="mt-3 flex flex-col justify-center gap-2 sm:flex-row">
+                  {estimate.require_deposit && paymentSummary.amountPaidCents === 0 && <button type="button" disabled={startingPayment} onClick={() => void startCustomerPayment("deposit")} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{startingPayment ? "Opening Stripe…" : `Pay down payment · $${depositAmount.toFixed(2)}`}</button>}
+                  <button type="button" disabled={startingPayment} onClick={() => void startCustomerPayment("balance")} className="rounded-lg border border-blue-700 px-4 py-2.5 text-sm font-semibold text-blue-800 disabled:opacity-50">{startingPayment ? "Opening Stripe…" : paymentSummary.amountPaidCents > 0 ? `Pay remaining balance · $${((paymentSummary.totalCents - paymentSummary.amountPaidCents) / 100).toFixed(2)}` : `Pay in full · $${(paymentSummary.totalCents / 100).toFixed(2)}`}</button>
+                </div>
+              </div>}
             </div>
           ) : (
             <>

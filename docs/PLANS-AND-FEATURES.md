@@ -15,7 +15,7 @@ This is the source-of-truth feature matrix for the app and public pricing page.
 | Job scheduling, job tracking, actual costs, and invoice status | Not included | Included |
 | Job-value and gross-profit report metrics | Not included | Included |
 | Good / Better / Best package options and proposal deposit terms | Not included | Included |
-| Customer invoice payments through Stripe | Not available yet | Not available yet |
+| Customer down payments, pay-in-full, and remaining-balance payments through Stripe | Not included | Included; requires contractor Stripe setup |
 
 Free estimates use local price-book rates and local guidance. Pro cloud AI, estimate email, follow-ups, and proposal-question email alerts make provider-backed calls and require an active or trialing subscription. A saved estimate is counted when its database row is successfully created; the quota is atomic and resets at 00:00 UTC. Failed inserts do not consume quota.
 
@@ -27,4 +27,4 @@ The public support form remains available to prospective customers and is protec
 
 ## Payment collection status
 
-WorkCraft AI Pro is sold through Stripe subscriptions. Contractor-to-customer invoice payment collection using Stripe Connect has not been implemented. Deposit settings describe proposal terms only; they do not charge customers. Do not advertise customer payment collection until Connect onboarding, connected-account payments, webhook reconciliation, refunds/disputes, and production verification are implemented.
+WorkCraft AI Pro is sold through a separate Stripe subscription. Customer payments use Stripe Connect direct charges on each contractor's connected account; WorkCraft AI does not collect or transfer the customer funds. Stripe-hosted onboarding collects contractor verification and payout details. The contractor is responsible for the work, payment terms, customer support, refunds, and disputes. Payments remain unavailable in production until Connect is enabled and approved, the database migration is applied, connected-account webhooks are configured, and end-to-end verification is complete.

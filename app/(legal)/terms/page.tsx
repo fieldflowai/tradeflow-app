@@ -28,7 +28,7 @@ export default function TermsPage() {
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-slate-900">3. Paid Plans and Payments</h2>
           <p className="text-sm leading-7 text-slate-700">
-            Some features require an active paid plan. Plan charges are processed through Stripe. When you enable customer deposits or payments, the customer is directed to Stripe Checkout. You are responsible for the prices, deposits, and payment terms shown in your estimates.
+            Some features require an active paid plan. Plan charges are processed through Stripe. If you enable customer payments, your customer pays your connected Stripe account directly through Stripe Checkout. You are responsible for your services, prices, taxes, payment terms, customer support, refunds, and disputes. WorkCraft AI does not hold or transfer your customer funds. Stripe may require identity, business, and payout verification before you can accept payments.
           </p>
         </section>
 

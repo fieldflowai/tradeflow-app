@@ -49,7 +49,7 @@ Create a folder or a simple spreadsheet with columns for `topic`, `approved fact
 
 - WorkCraft AI supports estimates, proposals, jobs, price book management, reports, and invoices.
 - AI can help draft estimate scope and line items; the contractor must verify details, quantities, rates, taxes, and terms.
-- Down payments are not currently available in the product.
+- Down payments and full customer payments are Pro-only and require Stripe Connect setup. Do not advertise collection as live until the Stripe Connect production checks are complete.
 - Do not claim integrations, customer outcomes, or automation that are not actually live.
 - Demo content and screenshots must use fictional names and data.
 

@@ -22,6 +22,11 @@ export default function ProfilePage() {
   const [planStatus, setPlanStatus] = useState("free");
   const [upgrading, setUpgrading] = useState(false);
   const [managingBilling, setManagingBilling] = useState(false);
+  const [connectLoading, setConnectLoading] = useState(true);
+  const [connectingStripe, setConnectingStripe] = useState(false);
+  const [stripeConnected, setStripeConnected] = useState(false);
+  const [stripeChargesEnabled, setStripeChargesEnabled] = useState(false);
+  const [stripeRequirementsDue, setStripeRequirementsDue] = useState(true);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,8 +51,18 @@ export default function ProfilePage() {
         setMarkupPercentage(String(user.user_metadata?.markup_percentage ?? 0));
         const { data: plan } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
         if (plan) setPlanStatus(plan.status);
+        try {
+          const response = await fetch("/api/stripe/connect/status", { cache: "no-store" });
+          const connect = await response.json();
+          if (response.ok) {
+            setStripeConnected(connect.connected === true);
+            setStripeChargesEnabled(connect.chargesEnabled === true);
+            setStripeRequirementsDue(connect.requirementsDue === true);
+          }
+        } catch { /* Stripe status is rechecked before each payment session. */ }
       }
       setLoading(false);
+      setConnectLoading(false);
     }
 
     loadProfile();
@@ -106,6 +121,19 @@ export default function ProfilePage() {
     }
   };
 
+  const handleConnectStripe = async () => {
+    setConnectingStripe(true); setError(null);
+    try {
+      const response = await fetch("/api/stripe/connect/onboard", { method: "POST" });
+      const result = await response.json();
+      if (!response.ok || !result.url) throw new Error(result.error || "Unable to start Stripe setup.");
+      window.location.href = result.url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to start Stripe setup.");
+      setConnectingStripe(false);
+    }
+  };
+
   const hasProAccess = planStatus === "active" || planStatus === "trialing";
   const hasBillingHistory = planStatus !== "free";
   const needsBillingAttention = ["past_due", "unpaid", "incomplete"].includes(planStatus);
@@ -137,6 +165,22 @@ export default function ProfilePage() {
           {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : "Upgrade to Pro"}</button>}
         </div>
         {!hasProAccess && <p className="w-full text-xs text-slate-600">WorkCraft AI Pro is $9.99 per month. Free features remain available with no trial required.</p>}
+      </section>
+
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Customer payments</p>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">Stripe payment setup</h2>
+            <p className="mt-1 max-w-xl text-xs leading-5 text-slate-600">Customers pay your business directly through Stripe. Stripe collects verification and bank details, and you manage payments, refunds, disputes, and payouts with Stripe.</p>
+            {!hasProAccess && <p className="mt-2 text-xs font-semibold text-slate-700">Customer payment collection is a Pro feature.</p>}
+            {hasProAccess && !connectLoading && stripeConnected && stripeChargesEnabled && <p className="mt-2 text-xs font-semibold text-green-700">Stripe is connected and can accept payments.{stripeRequirementsDue ? " Stripe may request updated business information later." : ""}</p>}
+            {hasProAccess && !connectLoading && stripeConnected && !stripeChargesEnabled && <p className="mt-2 text-xs font-semibold text-amber-700">Finish Stripe verification before accepting customer payments.</p>}
+            {hasProAccess && !connectLoading && !stripeConnected && <p className="mt-2 text-xs text-slate-600">Connect Stripe to collect down payments and invoice balances. You’ll complete a guided setup hosted by Stripe.</p>}
+            {hasProAccess && connectLoading && <p className="mt-2 text-xs text-slate-500">Checking Stripe connection…</p>}
+          </div>
+          {hasProAccess && <button type="button" disabled={connectingStripe || connectLoading || (stripeConnected && stripeChargesEnabled && !stripeRequirementsDue)} onClick={() => void handleConnectStripe()} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{connectingStripe ? "Opening Stripe…" : stripeConnected ? stripeChargesEnabled ? "Update Stripe details" : "Continue Stripe setup" : "Connect Stripe"}</button>}
+        </div>
       </section>
 
       <form

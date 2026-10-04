@@ -23,6 +23,9 @@ export default function PrivacyPage() {
           <p className="text-sm leading-7 text-slate-700">
             We use information to create and manage estimates, price books, schedules, invoices, approvals, and reports. If you use cloud estimate drafting, the job description and selected trade are sent to Google Gemini for processing. Local drafting runs in your browser. If you send an estimate or enable a follow-up, the customer email address and proposal details are sent to our email provider to deliver the message. Support requests are sent to our support inbox through Resend; WorkCraft AI does not store their message contents in its app database.
           </p>
+          <p className="text-sm leading-7 text-slate-700">
+            Customer payments are processed directly by Stripe on a contractor’s connected account. WorkCraft AI stores the connected account ID and payment amount, currency, Stripe transaction IDs, and payment/refund status for the contractor’s records; it does not store card or bank-account details or hold customer funds. Contractors provide identity, business, and payout information directly to Stripe.
+          </p>
         </section>
 
         <section className="space-y-3">
