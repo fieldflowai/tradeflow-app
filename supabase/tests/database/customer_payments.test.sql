@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(12);
+select plan(13);
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.stripe_connected_accounts'::regclass)
@@ -46,10 +46,14 @@ select throws_ok(
 insert into public.stripe_connected_accounts (user_id, stripe_account_id, charges_enabled, requirements_due)
 values ('a3000000-0000-4000-8000-000000000002', 'acct_pro_test', true, false);
 set local role service_role;
-select is(
-  (select payment_id from public.workcraft_prepare_customer_payment('a3000000-0000-4000-8000-000000000002', 'b3000000-0000-4000-8000-000000000002', 'deposit', 3000, 'acct_pro_test')),
-  (select id from public.customer_payments where estimate_id = 'b3000000-0000-4000-8000-000000000002'),
+select lives_ok(
+  $$select * from public.workcraft_prepare_customer_payment('a3000000-0000-4000-8000-000000000002', 'b3000000-0000-4000-8000-000000000002', 'deposit', 3000, 'acct_pro_test')$$,
   'the checkout procedure creates a pending payment for the authorized estimate'
+);
+select is(
+  (select count(*) from public.customer_payments where estimate_id = 'b3000000-0000-4000-8000-000000000002'),
+  1::bigint,
+  'the authorized estimate has exactly one pending payment row'
 );
 select is(
   (select reused from public.workcraft_prepare_customer_payment('a3000000-0000-4000-8000-000000000002', 'b3000000-0000-4000-8000-000000000002', 'deposit', 3000, 'acct_pro_test')),
