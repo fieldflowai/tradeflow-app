@@ -1,11 +1,15 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(24);
+select plan(25);
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.tradeflow_ai_daily_usage'::regclass)
   and (select relrowsecurity from pg_class where oid = 'public.tradeflow_ai_generation_events'::regclass),
   'AI usage tables have RLS enabled'
+);
+select ok(
+  exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'tradeflow_ai_generation_events_user_id_idx'),
+  'AI event user references are indexed'
 );
 select ok(
   not has_table_privilege('anon', 'public.tradeflow_ai_daily_usage', 'SELECT')
