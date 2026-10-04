@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { getEstimatePaymentData, paidCents } from "@/lib/customer-payments";
 
 export async function GET(
   _request: Request,
@@ -53,8 +54,21 @@ export async function GET(
     return data?.signedUrl ? { id: attachment.id, url: data.signedUrl } : null;
   }));
 
-  const { user_id: _privateOwnerId, converted_job_id: _privateJobId, ...publicEstimate } = estimate;
-  return NextResponse.json({ estimate: publicEstimate, converted: Boolean(_privateJobId), lineItems: lineItems ?? [], contractor, photos: photos.filter(Boolean) }, {
+  const paymentData = await getEstimatePaymentData(admin, id);
+  const { data: subscription } = estimate.user_id
+    ? await admin.from("subscriptions").select("status").eq("user_id", estimate.user_id).maybeSingle()
+    : { data: null };
+  const { data: connectedAccount } = estimate.user_id
+    ? await admin.from("stripe_connected_accounts").select("charges_enabled").eq("user_id", estimate.user_id).maybeSingle()
+    : { data: null };
+  const paymentSummary = {
+    amountPaidCents: paidCents(paymentData.payments),
+    totalCents: paymentData.totalCents,
+    available: ["active", "trialing"].includes(subscription?.status ?? "") && connectedAccount?.charges_enabled === true,
+  };
+
+  const publicEstimate = Object.fromEntries(Object.entries(estimate).filter(([key]) => key !== "user_id" && key !== "converted_job_id"));
+  return NextResponse.json({ estimate: publicEstimate, converted: Boolean(estimate.converted_job_id), lineItems: lineItems ?? [], contractor, photos: photos.filter(Boolean), paymentSummary }, {
     headers: {
       "Cache-Control": "private, no-store",
       "X-Robots-Tag": "noindex, nofollow",

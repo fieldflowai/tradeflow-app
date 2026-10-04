@@ -679,7 +679,7 @@ export default function CreateEstimatePage() {
                 </div>
               )}
             </div>
-            {!isProSubscriber && <p className="text-xs text-slate-500">Deposit terms are a Pro proposal option. WorkCraft AI does not collect customer payments yet. <Link href="/profile" className="font-semibold text-blue-700 underline">View Pro</Link></p>}
+            {!isProSubscriber && <p className="text-xs text-slate-500">Online deposits and customer payments require Pro and a connected Stripe account. <Link href="/profile" className="font-semibold text-blue-700 underline">View Pro</Link></p>}
 
             <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-sm">
               <span className="text-slate-600">Subtotal:</span>

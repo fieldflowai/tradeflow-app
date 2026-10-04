@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { getEstimatePaymentData, paidCents } from "@/lib/customer-payments";
 
 function getPeriodEnd(subscription: Stripe.Subscription) {
   const periodEnds = subscription.items.data.map((item) => item.current_period_end);
@@ -35,6 +36,52 @@ export async function POST(request: Request) {
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, { auth: { persistSession: false } });
 
+  async function syncCustomerPayment(paymentId: string, connectedAccountId: string, paymentIntentId?: string | null) {
+    const { data: payment, error: lookupError } = await admin.from("customer_payments")
+      .select("id, user_id, estimate_id, stripe_account_id, stripe_checkout_session_id")
+      .eq("id", paymentId).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!payment) return;
+    if (payment.stripe_account_id !== connectedAccountId) throw new Error("Connected account does not match the payment record.");
+    const { error: updateError } = await admin.from("customer_payments").update({
+      status: "succeeded",
+      stripe_payment_intent_id: paymentIntentId || undefined,
+      updated_at: new Date().toISOString(),
+    }).eq("id", paymentId).eq("stripe_account_id", connectedAccountId).not("status", "in", "(refunded,partially_refunded)");
+    if (updateError) throw updateError;
+
+    const current = await getEstimatePaymentData(admin, payment.estimate_id);
+    if (!current.estimate) throw new Error("Estimate for the payment no longer exists.");
+    const fullyPaid = paidCents(current.payments) >= current.totalCents;
+    const { error: estimateUpdateError } = await admin.from("estimates").update({ status: fullyPaid ? "paid" : "accepted" })
+      .eq("id", payment.estimate_id).eq("user_id", payment.user_id);
+    if (estimateUpdateError) throw estimateUpdateError;
+  }
+
+  async function syncRefund(charge: Stripe.Charge, connectedAccountId: string) {
+    const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent?.id;
+    if (!paymentIntentId) return;
+    const { data: payment, error: lookupError } = await admin.from("customer_payments")
+      .select("id, user_id, estimate_id, amount_cents")
+      .eq("stripe_payment_intent_id", paymentIntentId).eq("stripe_account_id", connectedAccountId).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!payment) return;
+    const refunded = Math.min(Number(payment.amount_cents), Number(charge.amount_refunded));
+    const nextStatus = refunded >= Number(payment.amount_cents) ? "refunded" : refunded > 0 ? "partially_refunded" : "succeeded";
+    const { error: updateError } = await admin.from("customer_payments").update({
+      status: nextStatus,
+      amount_refunded_cents: refunded,
+      updated_at: new Date().toISOString(),
+    }).eq("id", payment.id).eq("stripe_account_id", connectedAccountId);
+    if (updateError) throw updateError;
+    const current = await getEstimatePaymentData(admin, payment.estimate_id);
+    if (!current.estimate) return;
+    const fullyPaid = paidCents(current.payments) >= current.totalCents;
+    const { error: estimateUpdateError } = await admin.from("estimates").update({ status: fullyPaid ? "paid" : "accepted" })
+      .eq("id", payment.estimate_id).eq("user_id", payment.user_id);
+    if (estimateUpdateError) throw estimateUpdateError;
+  }
+
   async function syncSubscription(subscriptionId: string) {
     // Read the current Stripe object so retries and out-of-order event delivery
     // cannot roll local subscription status back to an older event snapshot.
@@ -56,10 +103,10 @@ export async function POST(request: Request) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const estimateId = session.metadata?.estimateId;
-    if (estimateId) {
-      const { error } = await admin.from("estimates").update({ status: "paid" }).eq("id", estimateId);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const paymentId = session.metadata?.payment_id;
+    if (paymentId && session.payment_status === "paid" && event.account) {
+      const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+      await syncCustomerPayment(paymentId, event.account, paymentIntentId);
     }
     const userId = session.client_reference_id || session.metadata?.user_id;
     if (session.mode === "subscription" && userId && session.subscription) {
@@ -74,6 +121,34 @@ export async function POST(request: Request) {
       }, { onConflict: "user_id" });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     }
+  }
+
+  if (event.type === "checkout.session.async_payment_succeeded") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    if (session.metadata?.payment_id && event.account) {
+      const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+      await syncCustomerPayment(session.metadata.payment_id, event.account, paymentIntentId);
+    }
+  }
+
+  if (event.type === "checkout.session.expired") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    if (session.metadata?.payment_id && event.account) {
+      const { error } = await admin.from("customer_payments").update({ status: "expired", updated_at: new Date().toISOString() })
+        .eq("id", session.metadata.payment_id).eq("stripe_account_id", event.account).eq("status", "pending");
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
+
+  if (event.type === "payment_intent.succeeded") {
+    const intent = event.data.object as Stripe.PaymentIntent;
+    if (intent.metadata.payment_id && event.account) {
+      await syncCustomerPayment(intent.metadata.payment_id, event.account, intent.id);
+    }
+  }
+
+  if (event.type === "charge.refunded") {
+    if (event.account) await syncRefund(event.data.object as Stripe.Charge, event.account);
   }
 
   if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {

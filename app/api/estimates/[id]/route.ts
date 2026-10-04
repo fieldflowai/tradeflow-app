@@ -124,7 +124,7 @@ export async function PUT(
     return jsonError("Unable to update this estimate.", 500);
   }
   if (!existing) return jsonError("Estimate not found.", 404);
-  if (existing.status === "paid") return jsonError("Paid estimates cannot be edited.", 409);
+  if (["accepted", "paid"].includes(existing.status)) return jsonError("Approved estimates cannot be edited. Create a new estimate if the terms need to change.", 409);
 
   const { data: subscription } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
   const isPro = subscription?.status === "active" || subscription?.status === "trialing";
