@@ -89,3 +89,6 @@ jobs:
 
       - name: Verify atomic free estimate limit under concurrency
         run: npm run test:db:quota-concurrency
+
+      - name: Verify atomic AI generation limit under concurrency
+        run: npm run test:db:ai-quota-concurrency

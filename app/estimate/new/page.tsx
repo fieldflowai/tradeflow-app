@@ -57,6 +57,7 @@ export default function CreateEstimatePage() {
 
   // Tier Toggle State (Free Local vs Paid AI)
   const [isProSubscriber, setIsProSubscriber] = useState(false);
+  const [aiDailyAllowance, setAiDailyAllowance] = useState<{ enabled: boolean; daily_limit: number; used: number; remaining: number } | null>(null);
 
   // Form State
   const [clientName, setClientName] = useState("");
@@ -177,6 +178,15 @@ export default function CreateEstimatePage() {
         const { data: plan } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
         const activePro = ["active", "trialing"].includes(plan?.status ?? "");
         setIsProSubscriber(activePro);
+        if (activePro) {
+          void fetch("/api/generate-estimate", { cache: "no-store" }).then(async (response) => {
+            if (!response.ok) return;
+            const allowance = await response.json();
+            setAiDailyAllowance(allowance);
+          }).catch(() => {});
+        } else {
+          setAiDailyAllowance(null);
+        }
         if (!activePro) { setRequireDeposit(false); setPackageOptions([]); }
       } else {
         setRequireDeposit(false); setPackageOptions([]);
@@ -203,6 +213,14 @@ export default function CreateEstimatePage() {
 
         const data = await res.json();
         if (data.error) throw new Error(data.error);
+
+        if (typeof data.remaining_daily_generations === "number") {
+          setAiDailyAllowance((previous) => previous ? {
+            ...previous,
+            used: previous.daily_limit - data.remaining_daily_generations,
+            remaining: data.remaining_daily_generations,
+          } : previous);
+        }
 
         if (!Array.isArray(data.line_items) || data.line_items.length === 0) throw new Error("No usable line items were returned.");
         draftedItems = data.line_items;
@@ -539,6 +557,7 @@ export default function CreateEstimatePage() {
                 ? "Describe the work and measurements. Gemini drafts the scope and quantities, then matching prices come from your Price Book; unmatched prices stay at $0 for you to fill in."
                 : "Describe the job and include measurements where you can. Trade-specific local rules draft common tasks and quantities; every line stays editable."}
             </p>
+            {isProSubscriber && aiDailyAllowance && <p role="status" className="text-[11px] text-slate-500">{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
             {!isProSubscriber && (
               <p className="text-[11px] text-slate-500">Local prices are starter reference rates, not live local quotes. Confirm measurements, materials, labor, and your own rates before sending.</p>
             )}
